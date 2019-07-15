@@ -1,0 +1,172 @@
+#!/usr/bin/env python
+"""
+Set up CentOS VM on KVM with LVM volumes
+"""
+
+__version__ = '0.1'
+
+TODO Logging funzt nicht
+
+# MODULES
+import os
+import logging
+import re
+logging.basicConfig()
+log = logging.getLogger(__name__)
+
+
+# MAIN FUNCTIONS
+def create_lvs(name, volumes):
+    """Create logical volumes"""
+    print('efrref')
+    log.info('hmm')
+
+def remove_lvs(name, volumes):
+    """Remove logical volumes"""
+    pass
+
+def bootstrap_vm(name, volumes):
+    """Install CentOS to VM"""
+    pass
+
+def register_vm(name, ram, cpu, volumes, kvm_config_dir):
+    """Add VM to KVM store"""
+    pass
+
+def unregister_machine(name):
+    """Remove VM from KVM store"""
+    pass
+
+
+# SUPPORT FUNCTIONS
+
+def validate_fqdn(string):
+    """
+    validate that host name is a fqdn name, see
+    https://stackoverflow.com/questions/11809631/fully-qualified-domain-name-validation
+    """
+
+    pattern = '(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}$)'
+    if not re.match(pattern, string):
+        raise KnownError('VM Name "{}" is no valid fqdn name'.format(string))
+
+class KnownError(BaseException):
+    """Stop execution here and print message to stderr, see script bottom"""
+    pass
+
+def cleanup():
+    """Remove all temp stuff"""
+    log.info('Bye!')
+
+
+# COMMAND LINE HANDLER
+if __name__ == '__main__':
+
+    # MODULES
+    import argparse
+    import signal
+    import logging
+    import sys
+    import os
+
+    # DEFAULT CONSTANTS
+    DEFAULT_RAM = 4 * 1024 * 1024 * 1024
+    DEFAULT_CPU = 4
+
+    DEFAULT_KVM_XML_DIR = os.path.join( '/etc', 'libvirt', 'qemu' )
+    DEFAULT_VOLUMES = (
+        'root:5G:vda', 
+        'swap:5G:vdb', 
+        'var:5G:vdc', 
+        'var_log:5G:vdd', 
+    )
+
+    # COMMAND LINE PARSER
+    parser = argparse.ArgumentParser(description=__doc__)
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument('-i','--install', action='store_true',
+        help='''install lvm volumes and kvm config and run base-installation'''
+    )
+    action_group.add_argument('-r','--remove', action='store_true',
+        help='''shutdown vm if running, remove machine config from hypervisor'''
+    )
+    action_group.add_argument('-R','--remove-all', action='store_true',
+        help='''remove disks from kvm host after running  "unregister" action'''
+    )
+    parser.add_argument('-a', '--ram', type=int, default=DEFAULT_RAM, 
+        help='''ram size for vm in bytes'''
+    )
+    parser.add_argument('-c', '--cpus', metavar='CPUs', type=int, default=DEFAULT_CPU, 
+        help='''number of CPU cores about to be attached to VM in kvm "auto" mode'''
+    )
+    parser.add_argument('-d', '--data-volumes', metavar='DATA_VOLUME', nargs='+', default=(),
+        help='''additional data volumes to create in the form <mount_point:size:drive>, e.g. "var_lib_mysql:100G:vde". Start at "vde" drive, vda...vdd is occupied, already'''
+    )
+    parser.add_argument('-n', '--name', metavar='VM_NAME', required=True,
+        help='''unique FQDN of virtual machine like test.domain.tld'''
+    )
+    parser.add_argument('-o', '--config-dir', default=DEFAULT_KVM_XML_DIR,
+        help='''directory where to place kvm definition file for registering kvm guest, default is "{0}"'''.format(DEFAULT_KVM_XML_DIR)
+    )
+    parser.add_argument( '-v', '--verbose', action='count', default=0, 
+        help='script verbosity, -v: show progress, -vv: debug mode - pipe to "logger" for long running tasks'
+    )
+    parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__)
+    #for ActionGroup in parser._action_groups[1:]:  # sort options
+    #    ActionGroup._group_actions.sort(key=lambda x:x.option_strings[0])
+    args = parser.parse_args()
+
+    # SIGNAL HANDLER
+    def exit_handler(Signal, StackFrame=None):
+        cleanup()
+        sys.exit(Signal)
+    signal.signal(signal.SIGINT, exit_handler)
+    signal.signal(signal.SIGTERM, exit_handler)
+
+    # LOGGING 
+    logging.basicConfig(
+        level={0:30, 1:20, 2:10}[min(2, args.verbose)],
+        format={
+            0: 'Error: %(message)s',
+            1: '%(message)s',
+            2: '%(name)s L%(lineno)3s, %(levelname)-8s: %(message)s',
+        }[min(2,args.verbose)]
+    )
+    log = logging.getLogger() # root logger controlling all loggers
+    logging.debug('jaja')
+
+    # MAIN: START ACTIONS
+    try:
+        log.info('vvvvvvvvvvv')
+        validate_fqdn(args.name)
+
+        if args.install:
+            create_lvs(args.name, DEFAULT_VOLUMES + args.data_volumes)
+            bootstrap_vm(args.name, DEFAULT_VOLUMES)
+            register_vm(
+                args.name, args.ram, args.cpus, 
+                DEFAULT_VOLUMES + args.data_volumes, args.config_dir,
+            )
+        elif args.remove:
+            unregister_machine(args.name)
+        elif args.remove_all:
+            unregister_vm(args.name)
+            remove_lvs(args.name, DEFAULT_VOLUMES)
+
+    # ERROR HANDLING
+    except KnownError as Error:
+        sys.stderr.write('{}\n'.format(Error))
+        exit_handler(os.EX_USAGE)
+
+    except KeyboardInterrupt:
+        sys.stderr.write('User break, bye!\n')
+        exit_handler(os.USAGE)
+
+    except Exception:
+        log.error('Unexpected script error, debug info:', exc_info=True)
+        exit_handler(os.EX_SOFTWARE)
+
+    else:
+        exit_handler(os.EX_OK)
+
+# vim: tabstop=4 shiftwidth=4 expandtab
