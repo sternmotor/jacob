@@ -1,0 +1,27 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Vim settings for debian linux systems
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+" VIM SYSTEM SETTINGS
+
+    " set font, colors and other gui options
+    if has("gui_running")           " any gui
+        set guifont=Menlo\ Regular:h14
+    else
+        set t_Co=256
+        set esckeys " Properly handle cursor key escape codes
+"        set mouse=  " Copy-paste with right mouse click /shift-insert, breaks snipmate
+    endif
+
+    map  <S-Insert> <MiddleMouse>
+    map! <S-Insert> <MiddleMouse>
+
+
+" FILE HANDLING, BACKUP AND HISTORY
+    set backupdir=~/.vim/
+    set directory=~/.vim/cache
+    set   viewdir=~/.vim/cache
+    if exists("&undodir")
+    set   undodir=~/.vim/cache
+    endif
+

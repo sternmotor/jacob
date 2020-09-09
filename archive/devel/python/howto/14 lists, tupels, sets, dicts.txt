@@ -1,0 +1,151 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+Lists:
+  * check if empty
+  Yes: if not seq:
+  No:  if len(seq): 
+
+
+# ranges
+range(7)
+[0, 1, 2, 3, 4, 5, 6]
+(MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY) = range(7)
+MONDAY is 0, now    
+
+
+
+# dictionary
+dictionary = perl hash = assoziative array
+
+d = {"server":"mpilgrim", "database":"master"}
+print d['server']
+
+
+del             # remove key ( + value)
+d.clear()       # remove all keys
+d.copy()        # create copy
+if key in d:    # contains
+d.items()       # list of (key, value)
+d.keys()        # list of keys
+d.values()      # list of values
+d.get(key1, key2)   # get some values
+d.pop(key1, key2)   # get + remove some values
+
+
+# lists = arrays
+a.append(x)  # append single element to list
+a.extend(s2) # s + s2
+a.pop(i)     # return and remove element at position i
+a.index("example") # find "example" in  array
+a.remove(element)
+a.reverse() # reverse whole list
+x in a, x not in a  # list contains element?
+min(a), max(a)
+element i in a: a[i], from end: a[-i]
+subsequence in a: a[i:j] 
+
+
+# take care:
+a2 = a1 # makes changes to a2 happen in a1, too (reference!)
+# to avoid, make a flat copy
+a2 = a1[:] # or
+a2 = list(a1)
+
+>>> a = ["a", "b", "mpilgrim", "z", "example"]
+>>> a[-2]
+z
+>>> a[1:-2]
+a b mpilgrim z
+
+# print lists
+>>> li = ['a', 'b', 'c']
+>>> "\n".join(li)
+a
+b
+c
+
+>>> li = [1, 2] * 3
+
+# array mapping
+>>> li = [1, 9, 8, 4]
+>>> li = [elem*2 for elem in li if elem > 1]
+>>> li
+[ 18, 16, 8]
+
+
+# sort by nth element of list
+# Suppose, for example, you have a list of tuples that you want to sort by the n-th field of each tuple. The following function will do that.
+
+def sortby(somelist, n):
+    nlist = [(x[n], x) for x in somelist]
+    nlist.sort()
+    return [val for (key, val) in nlist]
+
+
+
+# It is not possible to sort a dict, only to get a representation of a dict that is sorted. Dicts are inherently orderless, but other types, such as lists and tuples, are not. So you need a sorted representation, which will be a list—probably a list of tuple
+
+import operator
+x = {1: 2, 3: 4, 4:3, 2:1, 0:0}
+sorted_x = sorted(x.iteritems(), key=operator.itemgetter(1))
+
+
+
+Lists:
+  * check if empty
+    Yes: if not seq:
+    No:  if len(seq):
+
+
+# unify lists
+# note you can use these on pure lists only, lists of hashes do not work
+def uniq(alist)    # Fastest, does order preserving
+    set = {}
+    return [set.setdefault(e,e) for e in alist if e not in set]
+
+def uniq(alist)    # Fastest without order preserving
+set = {}
+map(set.__setitem__, alist, [])
+return set.keys()
+
+
+
+
+
+# tupels
+tStuff=()
+
+Tuples  
+    * are faster than lists 
+    * have no methods 
+    * are write - protected
+    * can be keys in dictionaries
+
+
+# sets  (Mengen)
+s = set([sequence]) # make s contain unordered, unified members of sequence
+t = set([sequence2]) 
+# tests
+from sets import Set
+    Set(s).issubset(t)   # does t contain all members of s?
+    Set(s).issuperset(t) # does s contain all members of t?
+
+list( Set(s).union(t) )  # s + t, unified, returns set, s and t can be lists
+Set(s).intersection(t)   # members which reside in bot s and t
+Set(s).difference(t)     # members of s not in t, members of t not in s 
+Set(s).symmetric_difference(t) # elements that are in exactly one of the sets
+
+# turn set to list again
+sl = list(s)
+
+# convert text to array with stripped contents:
+
+classifiers = filter(None, map(str.strip, """
+    Development Status :: 4 - Beta
+    Topic :: Utilities
+    Environment :: Console
+""".split('\n')))
+
+['Development Status :: 4 - Beta', 'Topic :: Utilities', 'Environment :: Console']

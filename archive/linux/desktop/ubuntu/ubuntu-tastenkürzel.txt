@@ -1,0 +1,19 @@
+WIN lange drücken + lesen
+
+STRG+Cursor: Arbeitsflächen wechseln (wie MAC)
+WIN+Cursor: Fenster vergrößern/verkleinern (wie Windows)
+STR+WIN: Arbeitsfläche wechseln, aktuelles Fenster mitnehmen
+
+ALT+MMOUSE: Fenstergröße ändern
+ALT+LMOUSE: Fenster verschieben
+ALT+^: FENSTER einer Anwendung cyclen
+WIN-w Fenster auswählen
+SHIFT-WIN-w Fenster aus allen Fenstern auswählen
+
+Advanced Settiings
+    sudo apt-get install compizconfig-settings-manager
+    ccsm
+    * Fenster plazieren > Fixed Window Placement: hier kann für Fenster
+     festgelegt werden auf welchem Viewport die öffnen sollen
+
+    * Win-Cursor Settings: ccsm Fenster "Grid"

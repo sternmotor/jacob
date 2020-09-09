@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+"""
+example: send_sms -s MySender -n 00491702224662 -n 004917177400323 -m "RZ down" 
+"""
+import json
+import requests
+import sys
+import argparse
+
+SMSAPI_ADDR = 'https://sgw01.cm.nl/json/gateway.ashx'
+SMSAPI_PASS = '01724ded-9ab7-4ff3-86d5-7b4626835747'
+
+# command line interface
+parser = argparse.ArgumentParser(epilog=__doc__)
+parser.add_argument(
+    '--sender', '-s', required=True, 
+    help='Sender number or short string without dots'
+)
+parser.add_argument(    
+    '--number', '-n', metavar='NUMBER', required=True, type=int , nargs='+', action='append',
+    help='Recipient number like "00491708866233", mutiple -n allowed'
+)
+parser.add_argument(
+    '--message', '-m', required=True, help='Short message, max 160 characters'
+)
+args = parser.parse_args()
+
+
+# assemble API query data
+PostData = {
+    'messages' : {
+        'authentication' : {
+            'producttoken' : SMSAPI_PASS,
+        },
+        'msg' : [ {
+                'from' : args.sender,
+                'to' : [{ 'number' : nu} for nu in args.number ],
+                'body' : {
+                    'content' : args.message,
+                },
+            },
+        ]
+    }        
+}
+
+# push request to api
+RequestHeaders = {
+    'Content-Type' : 'application/json',
+    'Accept' : 'application/json',
+    'Accept-Charset' : 'UTF-8',
+}
+
+Reponse = requests.post(SMSAPI_ADDR, data=json.dumps(PostData), headers=RequestHeaders)
+print(Response)
+
+#send_sms "JARVIS" "00491702220602" "RZ nicht erreichbar"  # torsten

@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+
+write ctream pipe handler 
+sigusr 1: display bw
+sigusr2: re-read bw
+
+io.BufferedRWPair  binary mode
+http://books.google.de/books?id=Chr1NDlUcI8C&pg=PA352&lpg=PA352&dq=io.BufferedRWPair+pipe+example&source=bl&ots=OAIwvljWEh&sig=Db9PhFlXDxB5qLab1TnPkmvVrtw&hl=de&ei=-5ViTM7BPJSOjAebipW7CQ&sa=X&oi=book_result&ct=result&resnum=10&ved=0CE0Q6AEwCQ#v=onepage&q&f=false
+

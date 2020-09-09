@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+import sys
+import re
+from yaml import load, dump
+
+n = sys.argv[1]
+
+# Too lazy to do it properly
+text = re.sub('.*!ruby\/.*','', open("/var/lib/puppet/yaml/facts/" + n + '.yaml').read())
+facts = load(text)['values']
+
+classes = [ 'ssh', 'dyn' ] # obtain from DB
+
+# Convert list to dict with empty values
+cdict = {}
+cdict = dict((x, "") for x in classes) 
+
+userlist = {
+        'jane': {
+            'uid':  201,
+            'home': '/home/jane'
+        },
+        'alex': {
+            'uid':  502,
+            'home': '/nfs/alex'
+        }
+    }
+
+cdict['dyn'] = { "smtpmx":"gw.mens.de", "ports" : [ 25, 587], "users" : userlist }
+node = {
+    'classes' : cdict,
+    'parameters' : {
+        "my_memory" : 216,
+        "location"  : facts['location'],    # "Hamburg",
+        "manager"   : "Jane Doe",
+        "nodename" : facts['fqdn']
+        }
+}
+
+dump(node, sys.stdout,
+    default_flow_style=False,
+    explicit_start=True,
+    indent=10 )
+
+

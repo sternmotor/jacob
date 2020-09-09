@@ -1,0 +1,466 @@
+  Vim Editor HOWTO (Vi Improved with syntax color highlight­
+  ing)
+  Al Dev (Alavoor Vasudevan)        alavoor@yahoo.com
+  v1.0, 14 October 1999
+
+  This document is a guide to very quickly setup Vim editor on Linux or
+  Unix systems. The information here will improve the prodcutivity of
+  programmer since Vim editor supports syntax color highlighting and
+  bold fonts which improves the "readability" of program code.  The
+  information in this document applies to all operating sytems where Vim
+  works that is - Windows 95/NT and all flavors of Unix like Linux,
+  Solaris, HPUX, AIX, SCO, Sinix, BSD, SCO, etc..
+  ______________________________________________________________________
+
+  Table of Contents
+
+  1. Introduction
+
+  2. Setup vim init files
+
+     2.1 Xdefaults parameters
+     2.2 Sample vimrc file
+     2.3 Sample gvimrc file
+
+  3. Color Syntax init files
+
+  4. VIM Usage
+
+  5. Online VIM help
+
+  6. Vim Home page and Vim links
+
+  7. Other Formats of this Document
+
+  ______________________________________________________________________
+
+  1.  Introduction
+
+  Vim editor stands for 'Vi Improved'. Vi is the most popular and
+  powerful editor in the Unix world. A good editor will improve the
+  productivity of the programmer. Vim supports color syntax highlighting
+  of program code and also different fonts like normal or bold.
+
+  To use Vim install the following rpm packages on linux -
+
+  ______________________________________________________________________
+          rpm -i vim*.rpm
+  OR do this -
+          rpm -i vim-enhanced*.rpm
+          rpm -i vim-X11*.rpm
+          rpm -i vim-common*.rpm
+          rpm -i vim-minimal*.rpm
+  ______________________________________________________________________
+
+  You can see the list of files the vim rpm installs by -
+
+  ______________________________________________________________________
+
+          rpm -qa | grep ^vim | awk '{print "rpm -ql " $1 }' | /bin/sh | less
+  ______________________________________________________________________
+
+  and browse output using j,k, CTRL+f, CTRL+D, CTRL+B, CTRL+U or using
+  arrow keys, page up/down keys.  See 'man less'.
+
+  For other flavors of unix download the source code file
+
+  ______________________________________________________________________
+
+          zcat vim.tar.gz | tar -xvf -
+          cd vim-5.5/src
+          ./configure --enable-gui=motif
+          make
+          make install
+  ______________________________________________________________________
+
+  For Windows 95/NT, download zip file and install clicking on setup.
+
+  2.  Setup vim init files
+
+  To enable the syntax color highlighting you should copy the vimrc file
+  to your home directory. This will also put the "Syntax" Menu with gvim
+  command.  You can click on Syntax Menu and select appropriate
+  languages like C++, Perl, Java, SQL, ESQL etc..
+
+  ______________________________________________________________________
+  cd $HOME
+  cp /usr/doc/vim-common-5.3/gvimrc_example  ~/.gvimrc
+  cp /usr/doc/vim-common-5.3/vimrc_example  ~/.vimrc
+  ______________________________________________________________________
+
+  Comment lines in .vimrc begin with double-quotes (").  You can cus­
+  tomize vim by editing the file $HOME/.vimrc and put the following
+  lines -
+
+  ______________________________________________________________________
+  "set guifont=9x15bold
+  set guifont=8x13bold
+  "set guifont=7x14bold
+  "set guifont=7x13bold
+  ______________________________________________________________________
+
+  The tabstop is number spaces TAB will put while editing with gvim. The
+  shiftwidth is the number spaces the lines will be shifted with ">>" or
+  "<<" vi commands. Refer to Vi tutorials more details.  To set the tab­
+  stop and shiftwidth -
+
+  ______________________________________________________________________
+  set tabstop=4
+  set shiftwidth=4
+  set nowrapscan
+  set ignorecase
+  ______________________________________________________________________
+
+  2.1.  Xdefaults parameters
+
+  You can set some of the Vim properties in Xdefaults file.
+
+   WARNING: Do not put Vim*geometry it will break the gvim menu, use
+  Vim.geometry instead
+
+  Edit the $HOME/.Xdefaults and put the following lines:
+
+  ______________________________________________________________________
+  ! GVim great Colors.
+  Vim*useSchemes:         all
+  Vim*sgiMode:            true
+  Vim*useEnhancedFSB:     true
+  Vim.foreground:         Black
+  !Vim.background:        lightyellow2
+  Vim*background:         white
+  ! Do NOT use Vim*geometry , this will break the menus instead
+  ! use Vim.geometry. Asterik between Vim and geometry is not allowed.
+  ! Vim.geometry: widthxheight
+  Vim.geometry:           88x40
+  !Vim*font:              -misc-fixed-medium-r-normal--20-200-75-75-c-100-iso8859-15-*5
+  Vim*menuBackground: yellow
+  Vim*menuForeground: black
+  ______________________________________________________________________
+
+  You must re-start the X manager to make changes take effect.
+
+  You can also edit the  /.gvimrc file to change the background colors
+
+  ______________________________________________________________________
+          gvim $HOME/.gvimrc
+  ______________________________________________________________________
+
+  2.2.  Sample vimrc file
+
+  The sample vimrc from /usr/doc/vim-common-5.3/vimrc_example is as
+  follows:
+
+  " Vim
+  " An example for a vimrc file.
+  "
+  " To use it, copy it to
+  "     for Unix and OS/2:  ~/.vimrc
+  "             for Amiga:  s:.vimrc
+  "  for MS-DOS and Win32:  $VIM\_vimrc
+
+  set nocompatible        " Use Vim defaults (much better!)
+  set bs=2                " allow backspacing over everything in insert mode
+  set ai                  " always set autoindenting on
+  set backup              " keep a backup file
+  set viminfo='20,\"50 " read/write a .viminfo file, don't store more
+                          " than 50 lines of registers
+
+  " In text files, always limit the width of text to 78 characters
+  autocmd BufRead *.txt set tw=78
+
+  " For Win32 GUI: remove 't' flag from 'guioptions': no tearoff menu entries
+  " let & guioptions = substitute(& guioptions, "t", "", "g")
+
+  " Don't use Ex mode, use Q for formatting
+  map Q gq
+
+  " Switch syntax highlighting on, when the terminal has colors
+  " Also switch on highlighting the last used search pattern.
+  if & t_Co > 2 || has("gui_running")
+    syntax on
+    set hlsearch
+  endif
+
+  augroup cprog
+    " Remove all cprog autocommands
+    au!
+
+    " When starting to edit a file:
+    "   For *.c and *.h files set formatting of comments and set C-indenting on.
+    "   For other files switch it off.
+    "   Don't change the order, it's important that the line with * comes first.
+    autocmd BufRead *       set formatoptions=tcql nocindent comments&  autocmd BufRead *.c,*.h set formatoptions=croql cindent comments=sr:/*,mb:*,el:*/,://
+  augroup END
+
+  augroup gzip
+    " Remove all gzip autocommands
+    au!
+
+    " Enable editing of gzipped files
+    "     read: set binary mode before reading the file
+    "           uncompress text in buffer after reading
+    "    write: compress file after writing
+    "   append: uncompress file, append, compress file
+    autocmd BufReadPre,FileReadPre        *.gz set bin
+    autocmd BufReadPost,FileReadPost      *.gz let ch_save = & ch|set ch=2
+    autocmd BufReadPost,FileReadPost      *.gz '[,']!gunzip
+    autocmd BufReadPost,FileReadPost      *.gz set nobin
+    autocmd BufReadPost,FileReadPost      *.gz let & ch = ch_save|unlet ch_save
+    autocmd BufReadPost,FileReadPost      *.gz execute ":doautocmd BufReadPost " . expand("%:r")
+
+    autocmd BufWritePost,FileWritePost    *.gz !mv <afile> <afile>:r
+    autocmd BufWritePost,FileWritePost    *.gz !gzip <afile>:r
+
+    autocmd FileAppendPre                 *.gz !gunzip <afile>
+    autocmd FileAppendPre                 *.gz !mv <afile>:r <afile>
+    autocmd FileAppendPost                *.gz !mv <afile> <afile>:r
+    autocmd FileAppendPost                *.gz !gzip <afile>:r
+  augroup END
+  2.3.  Sample gvimrc file
+
+  The sample gvimrc from /usr/doc/vim-common-5.3/gvimrc_example is as
+  follows:
+
+  ______________________________________________________________________
+  " Vim
+  " An example for a gvimrc file.
+  " The commands in this are executed when the GUI is started.
+  "
+  " To use it, copy it to
+  "     for Unix and OS/2:  ~/.gvimrc
+  "             for Amiga:  s:.gvimrc
+  "  for MS-DOS and Win32:  $VIM\_gvimrc
+
+  " Make external commands work through a pipe instead of a pseudo-tty
+  "set noguipty
+
+  " set the X11 font to use
+  " set guifont=-misc-fixed-medium-r-normal--14-130-75-75-c-70-iso8859-1
+
+  " Make command line two lines high
+  set ch=2
+
+  " Make shift-insert work like in Xterm
+  map <S-Insert> <MiddleMouse>
+  map! <S-Insert> <MiddleMouse>
+
+  " Only do this for Vim version 5.0 and later.
+  if version >= 500
+
+    " I like highlighting strings inside C comments
+    let c_comment_strings=1
+
+    " Switch on syntax highlighting.
+    syntax on
+
+    " Switch on search pattern highlighting.
+    set hlsearch
+
+    " For Win32 version, have "K" lookup the keyword in a help file
+    "if has("win32")
+    "  let winhelpfile='windows.hlp'
+    "  map K :execute "!start winhlp32 -k <cword> " . winhelpfile <CR>
+    "endif
+
+    " Hide the mouse pointer while typing
+    set mousehide
+
+    " Set nice colors
+    " background for normal text is light grey
+    " Text below the last line is darker grey
+    " Cursor is green
+    " Constants are not underlined but have a slightly lighter background
+    highlight Normal guibg=grey90
+    highlight Cursor guibg=Green guifg=NONE
+    highlight NonText guibg=grey80
+    highlight Constant gui=NONE guibg=grey95
+    highlight Special gui=NONE guibg=grey95
+
+  endif
+  ______________________________________________________________________
+
+  3.  Color Syntax init files
+
+  Instead of using "Syntax" menu you can also manually source in the
+  syntax file. Edit the file with gvim and at : (colon) command give so
+  command. For example -
+
+  ______________________________________________________________________
+          gvim foo.pc
+          :so $VIM/syntax/esqlc.vim
+  ______________________________________________________________________
+
+  The syntax source files are at /usr/share/vim/syntax/*.vim. Vim sup­
+  ports more than 120 different syntax files!!
+
+  4.  VIM Usage
+
+  You can use Vim in two modes - one with GUI and other without GUI.  To
+  use GUI use command -
+
+  ______________________________________________________________________
+          gvim foo.cpp
+  ______________________________________________________________________
+
+  To use non-gui mode give -
+
+  ______________________________________________________________________
+          vim foo.cpp
+  OR plain vanilla mode
+          vi foo.cpp
+  ______________________________________________________________________
+
+  5.  Online VIM help
+
+  See the online man pages. At unix shell prompt type 'man vim' and 'man
+  gvim'.
+
+  Or inside the gvim session type :help to get the help page.
+
+                          VIM - main help file
+
+        Move around:  Use the cursor keys, or "h" to go left,
+                      "j" to go down, "k" to go up, "l" to go right.
+  Close this window:  Use ":q<Enter>".
+     Get out of Vim:  Use ":qa!<Enter>" (careful, all changes are lost!).
+  Jump to a subject:  Position the cursor on a tag between |bars| and hit CTRL-].
+     With the mouse:  ":set mouse=a" to enable the mouse (in xterm or GUI).
+                      Double-click the left mouse button on a tag between |bars|.
+          jump back:  Type CTRL-T or CTRL-O.
+  Get specific help:  It is possible to go directly to whatever you want help
+                      on, by giving an argument to the ":help" command |:help|.
+                      It is possible to further specify the context:
+                            WHAT                  PREPEND    EXAMPLE      ~
+                        Normal mode commands     (nothing)   :help x
+                        Visual mode commands        v_       :help v_u
+                        Insert mode commands        i_       :help i_<Esc>
+                        command-line commands       :        :help :quit
+                        command-line editing        c_       :help c_<Del>
+                        Vim command arguments       -        :help -r
+                        options                     '        :help 'textwidth'
+
+  |howto.txt|     how to do the most common things
+  |tutor|         30 minutes training course for beginners
+  |copying|       About copying Vim and Uganda
+  |www|           Vim on the World Wide Web
+  |bugs|          Where to send bug reports
+
+  list of documentation files:
+
+  |intro.txt|     introduction to Vim
+  |help.txt|      overview and quick reference (this file)
+  |index.txt|     alphabetical index for each mode
+  |quotes.txt|    remarks from users of Vim
+  |todo.txt|      known problems and desired extensions
+  |autocmd.txt|   automatically executing commands on an event
+  |change.txt|    delete and replace text
+
+  6.  Vim Home page and Vim links
+
+  The home page of vim is at  <http://www.vim.org> and mirror site in US
+  is at  <http://www.us.vim.org>
+
+  Vim FAQ is at  <http://www.grafnetix.com/~laurent/vim/faq.html> and at
+  <http://www.vim.org/faq>
+
+  Eli's Vim Page at  <http://www.netusa.net/~eli/src/vim.html>
+
+  The Vi Lovers Home Page  <http://www.cs.vu.nl/~tmgil/vi.html>
+
+  Vim Reference Guide at  <http://scisun.sci.ccny.cuny.edu/~olrcc/vim/>
+
+  Vim mailing list at
+  <http://www.findmail.com/listsaver/vimannounce.html> and
+  <http://www.vim.org/mail.html>
+
+  Mailing list archives are kept at:
+
+  ·  <http://www.egroups.com/group/vim>
+
+  ·  <http://www.egroups.com/group/vimdev>
+
+  ·  <http://www.egroups.com/group/vimannounce>
+
+  Vim macros  <http://www.grafnetix.com/~laurent/vim/macros.html>
+
+  7.  Other Formats of this Document
+
+  This document is published in 10 different formats namely - DVI,
+  Postscript, Latex, LyX, GNU-info, HTML, RTF(Rich Text Format), Plain-
+  text, Unix man pages and SGML.
+
+  ·  You can get this HOWTO document as a single file tar ball in HTML,
+     DVI, Postscript or SGML formats from -
+     <ftp://sunsite.unc.edu/pub/Linux/docs/HOWTO/other-formats/> or
+     <ftp://metalab.unc.edu/pub/Linux/docs/HOWTO/other-formats/>
+
+  ·  Plain text format is in:
+     <ftp://sunsite.unc.edu/pub/Linux/docs/HOWTO> or
+     <ftp://metalab.unc.edu/pub/Linux/docs/HOWTO>
+
+  ·  Translations to other languages like French, German, Spanish,
+     Chinese, Japanese are in
+     <ftp://sunsite.unc.edu/pub/Linux/docs/HOWTO> or
+     <ftp://metalab.unc.edu/pub/Linux/docs/HOWTO> Any help from you to
+     translate to other languages is welcome.
+
+     The document is written using a tool called "SGML tool" which can
+     be got from - <http://www.xs4all.nl/~cg/sgmltools/> Compiling the
+     source you will get the following commands like
+
+  ·  sgml2html vim-howto.sgml     (to generate html file)
+
+  ·  sgml2rtf  vim-howto.sgml     (to generate RTF file)
+
+  ·  sgml2latex vim-howto.sgml    (to generate latex file)
+
+  This document is located at -
+
+  ·  <http://sunsite.unc.edu/LDP/HOWTO/VIM-HOWTO.html>
+
+  Also you can find this document at the following mirrors sites -
+
+  ·  <http://www.caldera.com/LDP/HOWTO/VIM-HOWTO.html>
+
+  ·  <http://www.WGS.com/LDP/HOWTO/VIM-HOWTO.html>
+
+  ·  <http://www.cc.gatech.edu/linux/LDP/HOWTO/VIM-HOWTO.html>
+
+  ·  <http://www.redhat.com/linux-info/ldp/HOWTO/VIM-HOWTO.html>
+
+  ·  Other mirror sites near you (network-address-wise) can be found at
+     <http://sunsite.unc.edu/LDP/hmirrors.html> select a site and go to
+     directory /LDP/HOWTO/VIM-HOWTO.html
+
+  In order to view the document in dvi format, use the xdvi program. The
+  xdvi program is located in tetex-xdvi*.rpm package in Redhat Linux
+  which can be located through ControlPanel | Applications | Publishing
+  | TeX menu buttons.
+
+          To read dvi document give the command -
+                  xdvi -geometry 80x90 howto.dvi
+          And resize the window with mouse. See man page on xdvi.
+          To navigate use Arrow keys, Page Up, Page Down keys, also
+          you can use 'f', 'd', 'u', 'c', 'l', 'r', 'p', 'n' letter
+          keys to move up, down, center, next page, previous page etc.
+          To turn off expert menu press 'x'.
+
+  You can read postscript file using the program 'gv' (ghostview) or The
+  ghostscript program is in ghostscript*.rpm package and gv program is
+  in gv*.rpm package in Redhat Linux which can be located through Con­
+  trolPanel | Applications | Graphics menu buttons. The gv program is
+  much more user friendly than ghostscript.  Ghostscript and gv are also
+  available on other platforms like OS/2, Windows 95 and NT.
+
+               To read postscript document give the command -
+                       gv howto.ps
+
+               To use ghostscript give -
+                       ghostscript howto.ps
+
+  You can read HTML format document using Netscape Navigator, Microsoft
+  Internet explorer, Redhat Baron Web browser or any other web browsers.
+
+  You can read the latex, LyX output using LyX a "X-Windows" front end
+  to latex.
+

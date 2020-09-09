@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+
+
+
+# log level info: everything worth showing up in logs
+# log level debug: needed information when things go wrong or during development
+# warnings: log.warning
+# errors: raise exceptions, logging gets done from callers perspective
+# all othe
+
+# module logging
+# on top of each module, define some larifari logger:
+# important: set logger name here so messages can be filtered in parent
+
+    # example module
+    import logging
+    log = logging.getLogger( __name__ ) 
+    class Class()
+
+# do ot overwrite callers log instance by importet module 
+YES:
+    import module
+    instance = module.Class()
+NO:
+    from module import *
+    instance=Class()
+
+
+# exceptions: do not log exceptions but let parent module handle logging
+NO:
+    msg = "could not do anything"
+    log.error(msg)
+    raise SorryError( msg)
+
+    # but 
+YES:
+    msg = "could not do anything"
+    raise SorryError( msg)
+
+
+
+
+
+
+Example:
+
+# for running module, define logging like
+if __name__ == "__main__":
+    import sys
+    import os
+    import logging
+
+    log = logging.getLogger()
+
+    # debug logging
+    logging.basicConfig(
+        level    = logging.DEBUG        ,
+        datefmt  = "%Y-%m-%d %H:%M:%S"  ,
+        format   = "%(asctime)-20s %(levelname)-8s%(name)s:%(funcName)" \
+                 + "s[%(lineno)d]\t%(message)s"                         ,
+        #filename = ""                  ,
+    )
+
+    # standard logging
+    logging.basicConfig(
+        level    = logging.INFO        ,
+        datefmt  = "%Y-%m-%d %H:%M:%S"  ,
+        format   = "%(asctime)-20s %(levelname)-8s%(name)s\t%(message)s",
+        #filename = ""                  ,
+    )
+
+
+    # short logging
+    logging.basicConfig(
+        level    = logging.INFO        ,
+        datefmt  = "%Y-%m-%d %H:%M:%S"  ,
+        format   = "%(asctime)-20s %(message)s",
+        #filename = ""                  ,
+    )
+==============
+
+# log to file vers 1:
+import logging
+import logging.handlers
+
+LOG_FILENAME = '/tmp/logging_rotatingfile_example.out'
+
+# Set up a specific logger with our desired output level
+my_logger = logging.getLogger('MyLogger')
+my_logger.setLevel(logging.DEBUG)
+
+# Add the log message handler to the logger
+handler = logging.handlers.RotatingFileHandler(
+              LOG_FILENAME, maxBytes=20, backupCount=5
+          )
+my_logger.addHandler(handler)
+           
+
+
+# log to file vers. 2:
+import logging
+logging.basicConfig (
+    level    = logging.DEBUG,
+    format   = "%(asctime)s %(levelname)-8s %(message)s" ,
+    datefmt  = "%Y-%m-%d %H:%M:%S" ,
+    filename = '/tmp/spam.log',
+    filemode = 'w',
+)
+logging.debug(   "Very special information." )
+logging.info(    "I am doing this and that." )
+logging.warning( "You should know this."     )
+# CRITICAL, ERROR, EXCEPTION, WARNING, INFO, DEBUG
+
+log.DEBUG   
+    Detailed information, typically of interest only when diagnosing problems.
+log.INFO    
+    Confirmation that things are working as expected.
+log.WARNING 
+    An indication that something unexpected happened, or indicative of some problem in the near future (e.g. "disk space low"). The software is still working as expected.
+log.ERROR   
+    Due to a more serious problem, the software has not been able to perform some function. This should be a catched expression.
+log.CRITICAL    
+    A serious error, indicating that the program itself may be unable to continue running.  This should be a catched expression.
+
+msg.plain(text)
+    Display console output for ordinary usage of a command line script or program
+ 
+
+EXCEPTION
+    Report an error regarding a particular runtime event
+
+in modules
+==========
+    * no print allowed, yield/return values and raise exceptions 
+
+in scripts (module caller, frontend app):
+=========================================
+    * print output, yield/return values to os, capture exceptions (print & exit)
+
+verbosity levels
+================
+
+-qq   errors, critical
+-q    warnings, errors, critical
+-     print
+-v    log.info, print_ok, print_err, print_warn, print_start
+-vv   log.debug
+
+
+

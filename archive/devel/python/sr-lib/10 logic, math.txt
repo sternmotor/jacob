@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+Comparison
+  Yes: if x is [not] None 
+  No:   if x  == None   
+  No:   if x
+
+do not compare bool to True/False
+  Yes: if seq:
+  Not: if seq == True
+
+# conditions
+# type a:
+    x = ( true_value if condition else false_value )
+
+# type b:
+    if condition:
+        x = true_value
+    else:
+        x = false_value
+
+
+
+
+# variables simple
+>>> v = ('a', 'b', 'e')
+>>> (x, y, z) = v
+>>> x
+'a'
+>>> y
+'b'
+>>> z
+'e'
+
+
+# numbers
+abs(x), round(x), x ** y, randint(a,b), random()
+
+
+# bool
+# in Python, and and or perform boolean logic as you would expect, but they do not return boolean values; instead, they return one of the actual values they are comparing.
+
+False:
+    None, False, 0, '', [], (), {}, empty sets
+
+
+# and-or-trick
+>>> a = "first"
+>>> b = "second"
+>>> 1 and a or b
+'first'
+>>> 0 and a or b
+'second'
+
+
+# Using the and-or Trick Safely
+The real trick behind the and-or trick, then, is to make sure that the value of a is never false. One common way of
+doing this is to turn a into [a] and b into [b], then taking the first element of the returned list, which will be either a
+or b.
+>>> a = ""
+>>> b = "second"
+>>> (1 and [a] or [b])[0]
+''
+# why do that? even if you need to use the more complicated safe form, there are good reasons to do so. For example, there are some cases in Python where if statements are not allowed, such as in lambda functions.
+
+
+# check if variable is integer
+    def _isInt( self, var ):
+        try:
+            int_var = int(var)
+        except ValueError:
+            return False
+        else:
+            return int_var
+
+
+# comparison
+
+def compare_ips(x, y):
+
+    # split and transfer ip segements to integer
+    x1, x2, x3, x4 = [ int(z) for z in x[0].split('.') ]
+    y1, y2, y3, y4 = [ int(z) for z in y[0].split('.') ]
+
+    # do comparison
+    if   x1 > y1: return  1
+    elif x1 < y1: return -1
+    else:
+        if   x2 > y2: return  1
+        elif x2 < y2: return -1
+        else:
+            if   x3 > y3: return  1
+            elif x3 < y3: return -1
+            else:
+                if   x4 > y4: return  1
+                elif x4 < y4: return -1
+                else:
+                    return 0
+
+def sortedIps( ips ):
+    return sorted( ips, cmp=compare_ips)
+
+
+Comparison
+  Yes: if x is [not] None
+  No:   if x  == None
+  No:   if x
+
+do not compare bool to true/false
+  Yes: if seq:
+  Not: if seq == True
+
+# anzahl ziffern (digits) in Zahl:
+
+a = len(str(int))
+

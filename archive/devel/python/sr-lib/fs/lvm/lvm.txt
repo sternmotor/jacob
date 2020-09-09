@@ -1,0 +1,3 @@
+# lvm handler
+
+lv create resizes remove snap remove-snap merge-snap  getsize => ext, mb

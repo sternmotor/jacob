@@ -1,0 +1,60 @@
+Windows Best Of
+* Windows Software online Suche beim Öffnen von unbekannten Dateien: hat noch nie funktioniert
+* Versuch, Problemhilfe online zu finden: hat noch nicht einmla funktioniert
+* Office 2016: PDF-Anhänge werden beim Weiterleiten entfernt wenn die Vorschau offen ist
+* Update-Assitent Windows 10: lädt ewig herunter, neustart mit 2 Optionen: PC neu initialisieren > Angst! Ausschalten gewählt! > startet wieder, keine Updates - Update Assistent versucht erneut, Dateui herunterzuladen WTF Apple: Update sierra > high sierra (snapshiots für backups - wo sind dioe backups bei Windows?) , Umstellung auf APFS! : 20 Minuten genau eingehalten, danach waren sogar die Fesnter wieder offen und der Benutzer eingelogt. Fein.
+* Ich darf in Ordnern, welche über RDP kopiert wurden machen was ich will und darf diese Ordner auch irgendwohin kopieren, beim Verschieben (wobei Berechtigungen erhalten bleiben) jedoch kommt eine Warnung da dies eine unsichere Aktion wäre
+* Excel 2016: 6 Zellen in Excel markieren (nur Text), Excel schließen - Meldung "Es befinden sich große Mengen Daten im Zwischenspeicher"
+	das stimmte schon Ende 1987 nicht mehr ... die Überprüfung, wieviel Speicher vom verfügbaren prozentual belegt wird wurde nie eingebaut
+    
+* Domänen-Passwort läuft tagsüber ab: In diesem Fall funktioniert zum Beispiel Outlook nicht mehr (ohne Rückmeldung) und man muss das Erkennen, seine Arbeit unterbrechen und sich An- und Abmelden.
+
+* Wichtige Bestätigungs-Fenster werden nicht vor allen Fenstern (ausser dem aktiven) angezeigt sondern ganz hinten, das braucht eine Weile bis man das kleine Miststück gefunden und dann "ok" gedrückt hat
+* Icons lassen sich so weit an den desktop Rand schieben das die nicht mehr mit der Maus gegriffen werden können - wozu?
+* 64 bit ist 32 bit und 32 bit ist 64 bit
+    https://social.technet.microsoft.com/Forums/scriptcenter/en-US/6cf0f6bc-164e-4fa1-8612-476cf4de90e7/powershell-script-sharepoint-scheduled-task-fails?forum=ITCG
+
+    32 bit - %windir%\System32\WindowsPowerShell\V1.0 
+    64 bit - %windir%\Syswow64\WindowsPowerShell\V1.0
+    SHOULD BE
+    64 bit - %windir%\System32\WindowsPowerShell\V1.0 
+    32 bit - %windir%\Syswow64\WindowsPowerShell\V1.0
+    The default on 64 is SYSTEM32.  I know - it sounds backwards but that is how MS got it to work.
+    If we open a shortcut to the 32 bit PowerShell (x86) this is what it shows:
+    %SystemRoot%\syswow64\WindowsPowerShell\v1.0\powershell.exe
+    Notice that the 32 bit version is in SYSWOW64.  SYSWOW64 stands for System Windows On Window 64.  Again a bad choice of names.  The OS default is called WOW or Windows on Windows.  That now runs as Windows On Windows 64 meaning that we are running traditional 32 bit Windows in NEW Windows 64.  At least that was the half-baked Microsoft explanation.
+    Getting this backwards can and will drive you nuts.
+* RDS: der versucht sich wiederzuverbinden - hats bnisher noch nie geschafft. Abbrechen und neu verbinden geht sofort, selber schafters nicht
+* netprofm (netzwerklistendienst) läßt sich nicht stoppen, wenn das Fenster "Netzwerk-und Freigabecentern" geöffnet ist - wird gebraucht um den nlasvc neu zu sarten wenn Server nicht im Domänennetzwerk sind
+* Powershell
+function remove-wmiobject($Class, $Filter) {
+    $Class
+    $GetWmiParams = @{
+        Namespace = 'root\subscription'
+        Class = "$Class"
+        Filter = $Filter
+    }
+    Get-WmiObject @GetWmiParams | Remove-WmiObject
+}
+wo luiegt hier der fehler ... $Class funktioniert in der Ausgabe aber nicht als Parameter. WTF! Lösung: Class ist bei Powershell 5 ein geschützter Name ... wird so nicht angezeigt
+* Powershell Anzeige von Zeilen in welchen Fehler auftreten: Zeile 1 Zeichen 1
+D:\Seafile\Eigene Dateien\Arbeit\2013 fellowtech GmbH\Austausch\Aktuell\Watch-USB\watcher-permanent.ps1 : Das Argument
+kann nicht an den Parameter "Class" gebunden werden, da es NULL ist.
+In Zeile:1 Zeichen:1
++ & "D:\Seafile\Eigene Dateien\Arbeit\2013 fellowtech GmbH\Austausch\Ak ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [watcher-permanent.ps1], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,watcher-permanent.ps1
+
+mit throw an der gefundenen Stelle:
+
+ScriptHalted
+In D:\Seafile\Eigene Dateien\Arbeit\2013 fellowtech GmbH\Austausch\Aktuell\Watch-USB\watcher-permanent.ps1:109
+Zeichen:5
++     throw
++     ~~~~~
+    + CategoryInfo          : OperationStopped: (:) [], RuntimeException
+    + FullyQualifiedErrorId : ScriptHalted
+
+
+

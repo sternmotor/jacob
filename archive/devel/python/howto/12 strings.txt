@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+Strings:
+  * check for prefixes/ suffixes
+  use ''.startswith() and ''.endswith() instead of string slicing 
+  * use r"""string""" to disable escape sequences like (echo -e)
+  * use u"""string""" for unicode strings
+
+#UNICODE
+# default Python 2 encoding is 'ascii'
+# decode early, unicode everywhere, encode late
+s.decode('utf-8') # read from disc or user input
+    * <type 'str'> to <type 'unicode'>
+u.encode('utf-8') # when writing to disc or print
+    * <type 'unicode'> to <type 'str'>
+
+# string formatting
+integer, decimal %i, %d
+hex:   %x,%X
+float %f,%F
+float science %e,%E
+char  %c
+string %s
+
+str(None) # = string  - None
+
+if 'a' in name           : print 'Ja, er enthält den String "a".'
+if name.find('war') != -1: print 'Ja, er enthält den String "war".'
+
+import string
+print string.rjust(`x`, 2)
+
+
+s.count(sub [, start[, end]])  # this is contains
+s.upper(), s.lower()
+s.replace(old, new[, count])
+s.startswith(sub[, start[, end]]),
+s.endswith(sub[, start[, end]])
+
+# print single strings
+ print "%s is not a good password for %s" % (pwd, uid)
+>>> print "Today's stock price: %f" % 50.4625
+50.462500
+>>> print "Today's stock price: %.2f" % 50.4625
+50.46
+>>> print "Change since yesterday: %+.2f" % 1.5
+
+>>> print "Today's stock price: %f" % 50.4625
+50.462500
+>>> print "Today's stock price: %.2f" % 50.4625
+50.46
+>>> print "Change since yesterday: %+.2f" % 1.5
++1.50
+
+
+# user input
+name = raw_input ( " Wie heisst du ? " )
+print " Hallo " , name
+
+# build strings in source code
+# no! :
+x = "line1" + \ # cannot use comments!
+"line2"+ \
+"line3"
+
+# do:
+x = (
+"line1" # can use comments
+"line2"
+"line3"
+)
+
+

@@ -1,0 +1,44 @@
+I typically invoke rdiff-backup at -v6. 
+
+#====/bin/sh
+===
+# backup-report
+# a crude backup report munger
+# akb 05-jun-2003
+#   most recent mods 19-jan-04.
+
+grep -v "^Executing ssh -C" $1 || 
+
+## rdiff-backup 0.13.x...
+grep -v "^  Access control lists.*Off"            || 
+grep -v "^  Characters needing quoting.*''"     || 
+grep -v "^  Directory inc permissions.*On"        || 
+grep -v "^  Extended attributes.*Off"             || 
+grep -v "^  Hard linking.*On"                     || 
+grep -v "^  Mac OS X Finder information.*Off"     || 
+grep -v "^  Mac OS X style resource forks.*Off"   || 
+grep -v "^  Ownership changing.*On"               || 
+grep -v "^  fsync() directories.*On"              || 
+grep -v "^########## /"                          || 
+grep -v "^--------------------------------
+---------------------------------"  || 
+grep -v "^ACLs not supported on filesystem at /" || 
+grep -v "^Detected abilities for destination (read/write) file system:" 
+|-
+| 
+grep -v "^Detected abilities for source (read only) file system:" || 
+grep -v "^Removing directory .*"                  || 
+grep -v "^Starting increment operation .''' to .'''"  || 
+grep -v "^Unable to import module posix1e from pylibacl package."    || 
+grep -v "^Unable to import module xattr.  EAs not supported on filesystem 
+at /.*" || 
+grep -v "^Hard linking .''' to .'''" || 
+## rdiff-backup 0.12.x and 0.13.x
+grep -v "^Cleaning up" || 
+grep -v "^Incrementing mirror file" || 
+grep -v "^Making directory .*" || 
+grep -v "^Processing changed file .*" || 
+grep -v "^Regular copying" || 
+grep -v "^Touching mirror marker"
+
+

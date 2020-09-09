@@ -1,0 +1,25 @@
+There are four increment file types:
+
+    * snapshot - A snapshot increment file is an exact copy of its associated source file, including applicable permissions, ownership, etc. Snapshots are never made of directories.
+    * diff - A diff snapshot has the same metafile information (permissions, etc.) as its source counterpart, but instead of containing all the data of the source file at some time, it contains a diff, as produced by rdiff from the next later version of the source file to the version covered by the diff increment. Clearly, diff increments will only be created for regular files.
+    * dir markers - Dir markers just indicate that the associated source file is a directory. A dir marker has the same permissions, ownership, etc. as its source file. Dir markers are only created by an instance of rdiff-backup if something about a directory changes (this includes the content of files in the directory, the permissions of the directory, the permissions of a file in a subdirectory of the directory, and so forth).
+    * missing markers - Missing markers indicate that the associated source file does not exist at the given time and are made whenever a file exists at one backup instance that didn't exist at the last one. 
+
+
+
+2. The mirror directory
+
+After rdiff-backup is run, the contents of the mirror directory are the same as the contents of the source directory. This is why it is called the mirror directory. But there is one exception - the mirror directory will contain the data directory while the source directory won't. (If the source directory contains a directory called rdiff-backup-data, it will be ignored.)
+
+What constitutes sameness here could vary between instances. For example, a non-root user running rdiff-backup will not be able to change the permissions on the mirror files, so in this case two files could be the same even if they have different ownership. But, the closer the better.
+3. The data directory
+
+rdiff-backup may write to log files in this directory, like backup.log and restore.log. rdiff-backup never reads these, so they can be deleted if convenient.
+
+More importantly, all the increment files are stored in the data directory. 
+
+
+
+
+
+

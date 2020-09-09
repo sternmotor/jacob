@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+# in drbd < 8.2xx it is not possible to give the drbd devices useful names
+# here, for each device in sCONFIG_FILE, a link to /dev/drbd/disk_name is
+# getting set up
+
+sCONFIG_FILE = '/etc/drbd.conf'
+sLINK_DIR    = '/dev/drbd'
+
+import re 
+import sys
+from distutils import dir_util
+import os
+
+try:
+    dir_util.mkpath( sLINK_DIR )
+except Exception, emsg:
+    print "could not create dir for drbd links '%s'!\n(%s)" % ( sLINK_DIR, emsg)
+    sys.exit(1)
+
+
+
+try:
+    fdConfFile = open( sCONFIG_FILE )
+except Exception, emsg:
+    print "could not open config file '%s'!\n(%s)" % ( sCONFIG_FILE , emsg)
+    sys.exit(1)
+
+
+for line in fdConfFile:
+
+    if re.match( 'on ', line.strip() ):
+        aStripped = line.split('{')[1].split(';')
+        sDevice = aStripped[0].split(' ')[2].strip('"')
+        sDisk   = aStripped[1].split(' ')[2].split('/')[3].strip('"')
+        # remove old symlinks, first
+        try:
+            os.remove( os.path.join( sLINK_DIR,sDisk) ) 
+        except Exception, emsg:
+            pass
+        # create new link
+        print "linking '%s' to '%s' ... " % ( sDevice, os.path.join( sLINK_DIR,sDisk)),
+        try:
+            os.symlink( sDevice, os.path.join( sLINK_DIR,sDisk) ) 
+        except Exception, emsg:
+            print "ERROR!\n(%s)" % emsg
+            sys.exit(1)
+
+        print "ok"

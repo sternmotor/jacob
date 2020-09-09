@@ -1,0 +1,687 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#vim:fdm=marker
+# unlock vim folding via zR, zo and lock folding via zM, zc
+#----------------------------------------------------------------------------
+"""                                                                     
+DESCRIPTION    rsync handler for secu-ring servers                       {{{1
+               configure rsync calls by config file
+
+USAGE          call this script with -h or --help option
+      
+CHANGELOG    
+   10-02-12    * 
+
+TODO
+
+THANKS TO
+
+"""
+
+__version__ = "$Revision: 0.1.2010-02-12 $"
+# $Source$
+
+
+#----------------------------------------------------------------------------
+# modules import, constants                                              {{{1
+#----------------------------------------------------------------------------
+# standard
+import logging
+import sys
+import validate
+log = logging.getLogger( __name__ )
+
+# extra modules
+import pt.optparser # analyse command line options
+import pt.config    # configfile handler
+
+# constants
+MAIN_CONFIG_FILE   = "/etc/data/sync.conf"
+
+DEFAULT_CONFIG = """\
+#============================================================================#
+# CONFIG FILE SYNTAX                                                         #
+# * continue long lines via '\\'                                              #
+# * create lists by comma - separating items                                 #
+# * boolean var's: False = 0, false, no, off and True  = 1, true, yes, on    #
+# * comments: '#' ';' or '/* long comments */'                               #
+# * sections:                                                                #
+#    [section1] [[subsection1]]                                              #
+#    names of sections or keys are case=insensitiv                           #
+# * reference values of same section or of [DEFAULT] section via ${option}   #
+#============================================================================#
+
+# Global config for "data rsync" runs
+[DEFAULT]
+# ssh_quiet: disable ssh messages during remote login so rsync output
+# is not cluttered with "issue.txt" messages
+# Default:
+#ssh_quiet = no
+
+# ssh_fast: run ssh with weak encryption for fast data transfer. This is ok 
+# for transfers over VPN or in trusted networks. Compression is disabled anyway.
+# Default:
+#ssh_fast = yes
+
+# other ssh options:
+# Default:
+#ssh_user = 
+#ssh_port = 22
+
+[example]
+
+# source_path: directory at local or remote site. Appending '/' to the end of 
+# source defintion lets rsync copy the contents of source/, otherwise 
+# source directly is copied into target. Mandatory
+source_path = /etc/fstab
+
+# target_path: directory at local or remote site. '/' at end of target 
+# definition is ignored. Mandatory
+target_path = /tmp/fstab-synced
+
+# source_host, target_host: optional. Put in IP or dns name. You may want 
+# to specify ssh_user, ssh_port, ssh_fast, ssh_quiet for remote operation. 
+# Only source OR target remote operation is allowed. Define a 
+# comma separated list of hosts for multiple sync actions from different 
+# source_hosts respectively to different target_hosts.
+# Postcommands will be executed once for each source_host respectively 
+# on each of target_hosts.
+# Default:
+#source_host = 
+target_host = backup1.bb.srservers.net
+
+# rsync_excludes: Specify comma-separated list of entries here, read rsync
+# documentation for advice what to put in here.
+# Default:
+#rsync_excludes = 
+
+# rsync_options: Specify comma-separated list of entries here, read rsync
+# documentation for advice what to put in here.
+# Default:
+#rsync_options =
+
+# postcommands: subsection for current session which contains postcommand
+# definitions (shell commands). Define commands as comma separated list
+# (for preserving whitespaces in arguments).
+# Postcommands are run in order they are listed, here.
+# Postcommands are run at target host (lokal or remote), one run for
+# each defined source or target host.
+
+[[postcommands]]
+ls-etc = 'ls', "/tmp", "/etc/ssl"
+"""
+
+
+#----------------------------------------------------------------------------
+# Error Classes                                                          {{{1
+#----------------------------------------------------------------------------
+
+class DataSyncError(BaseException):
+    """General Error in data rsync run"""
+
+class DataSyncConfigError(DataSyncError):
+    """Error loading config"""
+
+class PostCommandError( DataSyncError):
+    """
+    Errors executing DataSync postcommands
+    """
+#----------------------------------------------------------------------------
+# Config Loader Class                                                    {{{1
+#----------------------------------------------------------------------------
+class DataSyncConfigLoader:
+    """
+    DESCRIPTION
+        load configs and merge them in the following order:
+        1. hard-wired script defaults (from DEFAULT_CONFIG)
+        2. MAIN_CONFIG_FILE
+        3. user options given in __init__ call (user_options=configObj object) 
+            this configObj should be used to hand over command line options
+
+    METHODS
+        __init__            : merge configs as described above
+        store_user_config() : save command line options/ user_options 
+                              to MAIN_CONFIG_FILE
+
+    OPTIONS
+    EXCEPTIONS
+    LOGGING
+    EXAMPLE
+    """
+
+    # class constants
+
+    def __init__(self, user_config=None, config_file = None ):
+        """
+        Load and check user defined configuration. You may specify options 
+        (source_path, source_port) when calling this class.
+        """
+
+        # load default settings from importet text string
+        default_config = pt.config.ConfigDefaultText(DEFAULT_CONFIG)
+
+        # load / setup main config
+        file_config = self._load_config( 
+            config_file,
+            "file config",
+            default_config,
+        )
+        default_config.merge( file_config )
+        self.config = default_config
+
+        # set options passed to config class
+        if user_config:
+            self.config.merge( user_config )
+            self.user_config = user_config
+
+        # self.config now contains merged configs, all config files
+        # should be in place now (at least as copy of template
+        log.debug( "Final (merged) config contains: %s" % self.config )
+
+
+    def store_user_config(self ):
+        """Merge user config to target config, store in target config file"""
+        self.config.write()
+        log.debug( 
+            "Merged user config to target config and stored in '%s'"
+            % self.config.filename
+        )
+
+    def _load_config( self, file, title, default_config):
+        """
+        Load a config file. If this fails, try to write default content
+        to this file.
+        
+        file = config file to load
+        title = title of file (e.g. "main config") for use in error messages
+        default_config = string with contents of new config file
+
+        Returns a configObj object or None when no file could be loaded
+        """
+
+        # try to load target config file ... 
+        try:
+            config = pt.config.ConfigFile( file, file_error=True)
+        except pt.config.config.ConfigFileError, emsg:
+            log.debug( 
+               "%s file '%s' not found, creating it from default "
+               "settings" % (title, file)
+            )
+            try:
+                default_config.write_file( file )
+            except pt.config.ConfigFileError, emsg:
+                raise DataSyncConfigError( emsg )
+            else:
+                return pt.config.ConfigFile( file, file_error=True)
+
+        except pt.config.ConfigError, emsg:
+            term.fail_msg( "%s" % emsg )
+            sys.exit(1)
+
+        # file is there already, merge in default config
+        else:
+            return config
+
+#----------------------------------------------------------------------------
+# main sync class                                                     {{{1
+#----------------------------------------------------------------------------
+#class DataSync:
+#    """
+#    Run rsync and postcommands following given config
+#    """
+#    def __init__(self, sessions, options, config):
+
+#----------------------------------------------------------------------------
+# post command execution                                                     {{{1
+#----------------------------------------------------------------------------
+def initiate_rsync( source_host, target_host, session_config, mcds=None ):
+    log_info(
+        "Session '%s'%s: Starting rsync run" 
+        % ( session, init_mcds(mcds) )
+     )
+
+    return pt.files.rsync.Rsync(
+        source_host   = source_host,
+        target_host   = target_host,
+        rsync_options = session_config['rsync_options'],
+        excludes      = session_config['rsync_excludes'],
+        ssh_quiet     = session_config['ssh_quiet'],
+        ssh_fast      = session_config['ssh_fast'],
+        ssh_user      = session_config['ssh_user'],
+        ssh_port      = session_config['ssh_port'],
+    )
+
+def init_mcds( string ):
+    """
+    Return display string for multiple source/target hosts
+    = mcds. Display only. Means: multi_cmd_display_string 
+    """
+    return string and ", host '%s'" % string  or ""
+
+
+def run_rsync( rsync_instance, mcds=None ):
+    try:
+        for line in rsync_instance.istart( 
+            session_config['source_path'],
+            session_config['target_path'],
+        ):
+            #log.info(line)
+            sys.stdout.write("%s\n" % line)
+    except pt.files.rsync.RsyncError, emsg:
+        log_fail(
+            "Session '%s'%s: Rsync errors, stopping session!" 
+            % ( session, init_mcds(mcds) )
+        )
+        return False
+    else:
+        log_pass( 
+            "Session '%s'%s: Rsync run finished" 
+            % (session,init_mcds(mcds) ) 
+        )
+        return True
+
+def run_postcommand(key, target_host, session_config, rsync_instance, mcds=None ):
+    """ run postcommand at target (lokal or remote), 
+    re-use Rsync SSH settings
+    """
+    log_info(
+        "Session '%s'%s: Starting post command '%s'" 
+        % (session, init_mcds(mcds), key)
+    )
+
+    try:
+        cmd_array = pt.data.validate.is_string_list(
+            session_config['postcommands'][key]
+        )
+    except pt.data.validate.VdtTypeError:
+        if session_config['postcommands'][key] == '':
+            log.debug( "Fixing arguments for postcommand '%s'" % key )
+            cmd_array = []
+        else:
+            cmd_array = [ session_config['postcommands'][key] ]
+    try:
+        for line in irun_post_command(
+            run , # pt.run.Run() instance
+            host          = target_host,
+            ssh_options   = rsync.ssh_options,
+            command       = cmd_array,
+        ):
+            sys.stdout.write("%s\n" % line)
+    except pt.run.RunError, emsg:
+        log_fail(
+            "Session '%s'%s: Post command '%s' failed (%s)" 
+            % (session, init_mcds(mcds), key, emsg)
+        )
+        return False
+    else:
+        log_pass(
+            "Session '%s'%s: Post command '%s' finished" 
+            % (session, init_mcds(mcds), key)
+        )
+        return True
+
+
+def irun_post_command(
+        run         ,
+        host        ,
+        ssh_options ,
+        command     ,
+    ):
+    """
+    Run shell command locally or via ssh at remote site
+    """
+
+    if host:
+        # run remote
+        cmd_array = ssh_options + [host] + command
+    else:
+        # run locally
+        cmd_array = command
+
+    log.info ( "STARTING command '%s'" % ' '.join(cmd_array) )
+    for line in run.start(cmd_array):
+        yield line
+
+
+
+def assemble_config( opts, sessions ):
+
+    # collect assemble command line user options
+    cmdline_session_data = {}
+
+    # rsync options
+    if opts.source_path: cmdline_session_data['source_path'] = opts.source_path
+    if opts.target_path: cmdline_session_data['target_path'] = opts.target_path
+    if opts.source_host: cmdline_session_data['source_host'] = opts.source_host
+    if opts.target_host: cmdline_session_data['target_host'] = opts.target_host
+   
+    if len( sessions ) > 0:
+        # session given, single options of first specified session may 
+        # be overwritten, see below else ...
+
+        if len( cmdline_session_data ) > 0:
+            log.debug( 
+                "Applying user defined config for all session (%s): %s"
+                % ( ','.join(sessions), cmdline_session_data )
+            )
+    else:
+        # no session given, both source and target need to be specified 
+        if opts.source_path or opts.target_path:
+            if opts.source_path and opts.target_path:
+                # everything fine, minimum requirement is met
+                # start user temporary session
+                log.debug( 
+                    "Setting up user defined session 'user_session': %s"
+                    % ( cmdline_session_data )
+                )
+                sessions.append( 'user_session' )
+            else:
+                term.fail_msg(
+                    "No SESSION defined and one of SOURCE_PATH or "
+                    "TARGET_PATH is missing, try --help !"
+                )
+                sys.exit(2)
+        else:
+            term.fail_msg(
+                "No SESSION defined and neither SOURCE_PATH nor "
+                "TARGET_PATH are specified, try --help !"
+            )
+            sys.exit(2)
+
+   
+
+    # create config with or without user defined options 
+    user_config = pt.config.Config()
+    for session in sessions:
+        user_config[session] = cmdline_session_data
+    else:
+        user_config = None
+
+    # load config from config file, merge in command line options
+    # except postcommand options ....
+    config =  DataSyncConfigLoader( 
+        user_config = user_config, 
+        config_file = opts.config_file,
+    ).config
+
+    #  postcommand option are merged into session data here:
+    if opts.postcmd_params:
+        log.debug( 
+            "Applying user defined postcommand arguments"
+            "('%s') for all sessions(): %s"
+            % ( ','.join(opts.postcmd_params), ','.join(sessions), )
+        )
+        # loop over "-p" options
+        for postcmd_param_string in validate.is_string_list( 
+            opts.postcmd_params 
+        ):
+            # get postcommand id and arguments ...
+            postcmd_param_array = validate.is_string_list(
+                postcmd_param_string.split(',')
+            )
+            postcmd_id   = postcmd_param_array[0]
+            postcmd_args = postcmd_param_array[1:]
+
+            # ... and append session config, if approbiate
+            for session in sessions:
+                try:
+                    config[session]['postcommands'][postcmd_id].extend(postcmd_args)
+                except KeyError:
+                    log.debug( 
+                        "Postcommand '%s' not found in configured session '%s'"
+                        % (postcmd_id, session)
+                    )
+                    continue
+                else:
+                    log.debug( 
+                        "Added arguments ('%s') to postcommand '%s' in session %s"
+                        % (','.join( postcmd_args), postcmd_id, session)
+                    )
+    return config   
+
+#----------------------------------------------------------------------------
+# support functions                                                      {{{1
+#----------------------------------------------------------------------------
+
+def log_info(msg):
+    log.info( msg )
+
+def log_fail(msg):
+    log.info( msg )
+    term.fail_msg(msg)
+
+def log_pass(msg):
+    log.info( msg )
+    term.pass_msg(msg)
+
+def parseArgs( args ):
+    # script specific command line options
+    parser = pt.optparser.OptParser(
+        usage       = '%prog SESSION [OPTIONS] [SESSION2] [SESSIONn]'               ,
+        description = 'Sync directories via rsync like specfied in config file or command line arguments. Standard operation is to load rsync settings from specifed config file section (SESSION). In case command line OPTIONS are given, these OPTIONS overwrite config file settings for all sessions ( rsync options and postcommand parameters). These new settings are not stored in config file. In case multiple SESSIONS are defined, these syncs are operated one after the other, p|s|t|o|a options apply to each SESSION. In first run, a standard config is created (%s), read comments there for more information.' % MAIN_CONFIG_FILE,
+        standard_opts = True,
+        daemon_opts   = False,
+    )
+    parser.add_option( '-f', '--config', dest="config_file",
+                    action='store', default = MAIN_CONFIG_FILE,
+                    help='Alternate config file, default is %s' % MAIN_CONFIG_FILE)
+    parser.add_option( '-p', '--param', dest="postcmd_params",
+                    action='append', default = None,
+                    help='Define parameters for one postcmd in the form  -p \"command_id, \'1starg\', \'2ndarg\'\", define \'-p\' option multiple times for different command_id\'s. This parameters are applied to matching command_id\'s in all sessions')
+    parser.add_option( '-s', '--source-path', dest="source_path",
+                    action='store', default = None,
+                    help='Start sync from SOURCE_PATH - do not forget to define source_host for remote operation')
+    parser.add_option( '-t', '--target-path', dest="target_path",
+                    action='store', default = None,
+                    help='Start sync to TARGET_PATH - do not forget to define target_host for remote operation')
+    parser.add_option( '-o', '--source-host', dest="source_host",
+                    action='store', default = None,
+                    help='Start sync from SOURCE_HOST (remotely over ssh)')
+    parser.add_option( '-a', '--target-host', dest="target_host",
+                    action='store', default = None,
+                    help='Start sync to TARGET_HOST (remotely over ssh)')
+
+    # command line option handling
+    return parser.parse_args( args, log )
+
+
+#----------------------------------------------------------------------------
+# command line and config handling, method calls invocation              {{{1
+#----------------------------------------------------------------------------
+if __name__ == "__main__":
+    import sys
+    import os
+    import pt.terminal as term # flush buffers, colors, terminal size
+    import pt.logger   # set up logger
+    import pt.files.rsync
+    import pt.data.validate
+    import pt.run
+
+    # initialize logger
+    log = pt.logger.Logger(
+        name         = None , # None = root logger
+        level        = logging.DEBUG,  
+        file_file    = None,      # None = no file logging
+        file_level   = logging.DEBUG,         
+    )
+
+    opts, sessions = parseArgs( sys.argv[1:] )
+    config = assemble_config( opts, sessions )
+
+    # in config all available sessions are defined 
+    # ( including eventually user config from command line)
+    # next step is to work through called sessions
+
+    errors = 0
+    run = pt.run.Run( )
+
+    for session in sessions:
+        # check if session is valid
+        if session not in config.keys():
+            log_fail(
+                "Session '%s' not defined in config, skipping!" % session
+            )
+            errors += 1
+            continue
+        else:
+
+            # announce session start
+            log_pass(
+                 "Session '%s': Config initialized, starting sync and "
+                 "post-commands" % session
+            )
+
+            # merge session config and default settings
+            session_config = pt.config.Config()
+            session_config.merge( config['DEFAULT'] )
+            session_config.merge( config[session] )
+
+            # repair config arrays
+            for key in ['rsync_options', 'rsync_excludes']:
+                
+                # no option
+                if session_config[key] == '':
+                    session_config[key] = []
+
+                # string => array
+                elif not type(session_config[key]) == type ([]):
+                    session_config[key] = [ "%s" % session_config[key] ]
+
+            # repair empty host definitions
+            try:
+                session_config['source_host']
+            except KeyError:
+                session_config['source_host'] = None
+            try:
+                session_config['target_host']
+            except KeyError:
+                session_config['target_host'] = None
+
+            # check if there are multiple source or target hosts
+            try:
+                source_hosts = validate.is_string_list( 
+                    session_config['source_host']
+                )
+            except validate.VdtTypeError:
+                source_hosts = None
+            try:
+                target_hosts = validate.is_string_list( 
+                    session_config['target_host']
+                )
+            except validate.VdtTypeError:
+                target_hosts = None
+
+            if source_hosts and target_hosts:
+                log_fail(
+                    "Session '%s': both multiple target hosts and multiple "
+                    "source hosts defined, cannot handle this!"
+                    % session
+                )
+                errors += 1
+                continue
+
+            # check if postcommands are defined
+            try:
+                session_config['postcommands']
+            except KeyError:
+                session_has_postcommands = False
+            else:
+                session_has_postcommands = True
+
+            # check if there are multiple or single source/target hosts,
+            # initiate and run rsync and postcommands likewise
+
+            # mutiple source_hosts:
+            if   source_hosts:
+                log.debug( "Session %s: Multiple source hosts defined" % session)
+                for source_host in source_hosts:
+
+                    # rsync
+                    rsync = initiate_rsync( 
+                        source_host = source_host,
+                        target_host = session_config['target_host'],
+                        session_config = session_config,
+                        mcds = source_host,
+                    )
+                    if not run_rsync( rsync_instance=rsync, mcds=source_host ):
+                        errors += 1
+                        # do not continue postcommands after rsync errors
+                        continue
+
+                    # postcommand(s)
+                    if session_has_postcommands:
+                        for key in session_config['postcommands'].keys():
+                            if not run_postcommand( 
+                                key, 
+                                session_config['target_host'], 
+                                session_config, 
+                                rsync,
+                                mcds = source_host,
+                            ):
+                                errors += 1
+                                # do not continue postcommands after postcommand errors
+                                break
+            # mutiple target_hosts
+            elif target_hosts:
+                log.debug( "Session %s: Multiple target hosts defined" % session)
+                for target_host in target_hosts:
+
+                    # rsync
+                    rsync = initiate_rsync( 
+                        source_host = session_config['source_host'],
+                        target_host = target_host,
+                        session_config = session_config,
+                        mcds = target_host,
+                    )
+                    if not run_rsync( rsync_instance=rsync, mcds=target_host ):
+                        errors += 1
+                        # do not continue postcommands after rsync errors
+                        continue
+
+                    # postcommand(s)
+                    if session_has_postcommands:
+                        for key in session_config['postcommands'].keys():
+                            if not run_postcommand( 
+                                key, 
+                                target_host, 
+                                session_config, 
+                                rsync,
+                                mcds = target_host,
+                            ):
+                                errors += 1
+                                # do not continue postcommands after postcommand errors
+                                break
+            # single source or target host
+            else:
+                # rsync
+                rsync = initiate_rsync( 
+                    source_host = session_config['source_host'],
+                    target_host = session_config['target_host'],
+                    session_config = session_config,
+                )
+                if not run_rsync( rsync_instance=rsync ):
+                    # no postcommands after rsync error
+                    errors += 1
+                else:
+                    # postcommands after clean rsync run
+                    if session_has_postcommands:
+                        for key in session_config['postcommands'].keys():
+                            if not run_postcommand( 
+                                key, 
+                                session_config['target_host'], 
+                                session_config, 
+                                rsync, 
+                            ):
+                                errors += 1
+                                # do not continue postcommands after postcommand errors
+                                break
+        
+    # errors?
+    if errors == 0:
+        log_pass( "No errors found, looks fine ... bye" )
+        sys.exit(0)
+    else:
+        log_fail( "%s error(s) in total!" % errors )
+        sys.exit(1)
+
+

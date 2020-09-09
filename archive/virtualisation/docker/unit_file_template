@@ -1,0 +1,49 @@
+# see http://www.willhoeft-it.com/2016/06/03/docker-compose.html
+# http://www.willhoeft-it.com/2016/02/16/docker-101.html
+
+DEFAULT UNIT
+
+
+[Unit]
+Description=Rocket.chat Docker Container
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+# override this section in
+# /etc/systemd/system/docker-rocketchat.service.d/setup.conf
+RestartSec=10
+Restart=always
+
+Environment="IP=127.0.0.1"
+Environment="VOLUME_PREFIX=test-"
+Environment="CADDYFILE_SUFFIX="
+Environment="MAIL_URL=smtp://user:pass@smtp.mailprovider.org"
+Environment="PROJECT_PATH=/path/to/local/clone/of/wit-rocketchat"
+
+ExecStart=/usr/local/bin/docker-compose --file "${PROJECT_PATH}/docker-compose.yml" up
+ExecStop=/usr/local/bin/docker-compose  --file "${PROJECT_PATH}/docker-compose.yml" stop
+
+[Install]
+WantedBy=docker.service
+
+
+
+CONFIG FOR ONE CONTAINER
+/etc/systemd/system/docker-rocketchat.service.d/setup.conf:
+
+[Service]
+Environment="IP=192.168.178.34"
+Environment="VOLUME_PREFIX=prod-"
+Environment="CADDYFILE_SUFFIX=-prod"
+Environment="MAIL_URL=smtp://rocket:passwd@smtp.example.com"
+Environment="PROJECT_PATH=/opt/rocketchat"
+
+
+
+SYSTEMD commands
+sudo systemctl daemon-reload
+sudo systemctl enable /pfad/von/docker-rocketchat.service
+sudo systemctl start docker-rocketchat.service
+sudo journalctl -fu docker-rocketchat            # Ausgabe anzeigen
+

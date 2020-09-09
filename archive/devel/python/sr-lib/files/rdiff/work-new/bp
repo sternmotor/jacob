@@ -1,0 +1,214 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#vim:fdm=marker
+# unlock vim folding via zR, zo and lock folding via zM, zc
+#----------------------------------------------------------------------------
+"""                                                                     
+DESCRIPTION    rdiff-backup wrapper script                               {{{1
+
+USAGE          call this script with -h or --help option
+      
+CHANGELOG    
+   10-02-12    * creation, copied from fstools.py
+
+TODO
+
+THANKS TO
+
+"""
+
+__version__ = "$Revision: 0.1.2010-02-12 $"
+# $Source$
+
+
+#----------------------------------------------------------------------------
+# modules import, constants                                              {{{1
+#----------------------------------------------------------------------------
+# standard
+import logging
+import sys
+log = logging.getLogger( __name__ )
+
+# extra modules
+from pt.terminal  import *   # flush buffers, colors, terminal size
+from pt.optparser import *   # analyse command line options
+from pt.config    import *   # configfile handler
+from pt.files.rdiff import * # rdiff class and errors
+
+# constants
+# concentate exclude options strings
+EXCLUDES = (
+)
+
+REGEXP_EXCLUDES = (
+    r'rdiff-backup-data'         ,
+    r'RECYCLER'                  ,
+    r'RECYCLE.BIN'               ,
+    r'System Volume Information' ,
+    r'.recycle'                  ,
+    r'lost+found'                ,
+    r'.tmp$'                     ,
+    r'.TMP$'                     ,
+    r'.Thumbs.db$'               ,
+    r'Trashes'                   ,
+    )
+ 
+#----------------------------------------------------------------------------
+# Error class
+#----------------------------------------------------------------------------
+class BpError( BaseException):
+    """General rdiff script exception"""
+class BpOptionsError:
+    """Options Error"""
+
+
+#----------------------------------------------------------------------------
+# support functions                                                      {{{1
+#----------------------------------------------------------------------------
+def loadConfig( config_file ):
+    try:
+        return Config( config_file , create_empty = True )
+    except ConfigError, emsg:
+        log.error( emsg )
+        sys.exit ( 2 )
+
+
+def setupLogging():
+    """return logger instance"""
+    return Logger(
+#            style = "plain",
+            name         = __name__ , # __name__ or self.__class__.__name__ 
+            level        = logging.DEBUG,  
+            file_file    = None,      # None = no file logging
+            file_level   = logging.DEBUG,         
+        )
+
+
+def parseArgs( args ):
+    # script specific command line options
+    parser = OptParser(
+        usage       =  \
+            '%prog OPTIONS COMMAND [[user[%passwd]@]SOURCE::]PATH [[user[%passwd]@]TARGET::]PATH\nExample: %prog -u -r \'--exclude /bin\' \'/\' backup@backupserver:/srv/backup/new ' ,
+        description = 'Rdiff - backup wrapper script'   ,
+        standard_opts = True,
+        daemon_opts   = False,
+    )
+
+    parser.add_option( '-u', '--update', dest="update",
+                    action='store_true',
+                    help='Run rdiff-backup in backup mode')
+#    parser.add_option( '-f', '--configfile', dest="config",
+#                    action='store', default = None,
+#                    help='config file')
+    parser.add_option( '-r', '--rdiff-option', dest="rdiff_options",
+                    action='append',
+                    help='rdiff-backup option as of man page, multiple options may be defined')
+    parser.add_option( '', '--bwu', dest="bwu",
+                    action='store', default = None,
+                    help='Upload bandwidth limit [kbit/s]'  )
+    parser.add_option( '', '--bwd', dest="bwd",
+                    action='store', default = None,
+                    help='Download bandwidth limit [kbit/s]' )
+    parser.add_option( '-t', '--timeout', dest="timeout",
+                    action='store', default = None,
+                    help='Timeout for rdiff-backup run [s]')
+    parser.add_option( '-p', '--port', dest="port",
+                    action='store', default = None,
+                    help='Target port for ssh connection')
+    parser.add_option( '-f', '--fast', dest="fast",
+                    action='store_true',
+                    help='Run ssh in fast mode (worse encryption, no compression)')
+
+    # command line option handling
+    return parser.parse_args( args, log )
+
+
+#----------------------------------------------------------------------------
+# main script                                                            {{{1
+#----------------------------------------------------------------------------
+if __name__ == "__main__":
+    import sys
+    import os
+    import pt.logger   # set up logger
+    import pt.files.rdiff
+
+    # initialize logger
+    log = pt.logger.Logger(
+        name         = None,
+        level        = logging.DEBUG,
+        file_file    = None,      # None = no file logging
+        file_level   = logging.DEBUG,
+    )
+
+
+    # analyse command line
+    if sys.argv[0] == '-':
+        # test command line arguments
+        argv = [ 
+#            '-h',
+            '-v', 
+            '-u', 
+            '/etc',
+            '/tmp/etc',
+        ]
+    else:
+        # script called externally
+        argv = sys.argv[1:] 
+
+
+    opts, args = parseArgs( argv )
+    log.debug( args )
+    log.debug( opts )
+
+    # check source and target
+    try:
+        source= args[0]
+        target =args[1]
+    except IndexError:
+        print "Need both source and target like '[[user[%passwd]@]SOURCE::]PATH' !"
+        sys.exit(2)
+
+
+    if opts.update:
+
+        # concentate options
+        rdiff_options = ["--backup-mode", "--print-statistics" ]
+
+        # regexp excludes
+        for regexcl in REGEXP_EXCLUDES:
+            rdiff_options.append( "--exclude-regexp '%s'" % regexcl )
+        # standard excludes
+        for regexcl in EXCLUDES:
+            rdiff_options.append( "--exclude '%s'" % regexcl )
+        # extra options
+        if opts.rdiff_options:
+            rdiff_options.extend( opts.rdiff_options )
+    else:
+        print "Only update action (-u, --update) implemented yet ..."
+        sys.exit(1)
+
+    log.debug( source)
+    log.debug( target )
+
+    try:
+        rdiff = Rdiff(
+            timeout=opts.timeout,
+            bwu = opts.bwu,
+            bwd = opts.bwd,
+        )
+    except RdiffSystemError, emsg:
+        sys.stderr.write( "Error initializing rdiff-backup session:\n%s" % emsg )
+        sys.exit(1)
+
+    try:
+        rdiff.start(
+            source,
+            target,
+            rdiff_options = rdiff_options,
+        )
+    except RdiffSystemError, emsg:
+        sys.stderr.write( "Bp system error:\n%s" % emsg )
+        sys.exit(1)
+    except RdiffRunError, emsg:
+        sys.stderr.write( "Rdiff-backup system error:\n%s" % emsg )
+        sys.exit(1)

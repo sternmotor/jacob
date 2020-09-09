@@ -1,0 +1,85 @@
+#!/bin/bash
+# export and import mysql databases except for EXCLUDE_DBS for handling
+#   sparse and fragmented data space in case mysqladmin --optimize does 
+#   not hit (low memory etc)
+# * stop services depending on this mysql instance
+# * stop mysql, copy whole mysql datadir to WORKING_DIR
+# * start mysql, export specified database to WORKING_DIR
+# * remove database in mysql, remove data from mysql database
+# * import exported database into mysql session
+# * start  depending services again
+
+set -euo pipefail
+
+DEP_SERVICES="${@:-}"
+if [ -z "$DEP_SERVICES" ]; then
+    echo "Specifiy services depending on database like \"$(basename $0) service1 service2\"!" 1>&2
+    exit 1
+fi
+WORKING_DIR="/srv/rebuild-database/$(date +%Y-%m-%d_%H-%M-%S)"
+
+MYSQL_OPTIONS='
+    --defaults-extra-file=/etc/mysql/debian.cnf
+    --default-character-set=utf8
+'
+
+DUMP_OPTIONS="$MYSQL_OPTIONS
+    --add-drop-database 
+    --comments 
+    --dump-date 
+    --events 
+    --flush-privileges
+    --quote-names
+    --routines 
+    --triggers 
+    --opt
+"
+
+# stop script in case some service does not exist
+for Service in $DEP_SERVICES; do
+    service $Service status > /dev/null
+done
+
+echo "Stopping services"
+    for Service in $DEP_SERVICES; do
+        echo " * $Service"
+        service $Service stop || exit 1
+    done
+
+# copy mysql data dir aside , export mysql database
+DataDir=$(mysql $MYSQL_OPTIONS -Bse 'SHOW VARIABLES WHERE Variable_Name LIKE "datadir"' | awk '{print $2}')
+
+echo "Copying consistent mysql data set to \"$WORKING_DIR\"" \
+    && service mysql stop \
+    && rm -rf "$WORKING_DIR" \
+    && mkdir -p "$WORKING_DIR" \
+    && cp -ra "$DataDir" "$WORKING_DIR" \
+    && service mysql start
+
+echo "Dumping databases to \"$WORKING_DIR\""
+    mysql $MYSQL_OPTIONS -Bse 'SHOW DATABASES' | while read DBName; do
+       case "$DBName" in
+            # skip non-dumpable databases
+            information_schema|performance_schema|mysql)
+                continue
+            ;;
+            *)
+                echo " * Dumping database \"$DBName\" to \"$WORKING_DIR/$DBName.sql.gz\"" \
+                    && mysqldump $DUMP_OPTIONS --databases -- $DBName \
+                    | gzip -6 --to-stdout > "$WORKING_DIR/$DBName.sql.gz"
+                # !! breaking of && ... && chain here is important so "-o pipefail works!!
+                echo -n " * Replacing mysql database \"$DBName\" with dump data ... " \
+                    && mysql $MYSQL_OPTIONS -Bse "DROP DATABASE $DBName" \
+                    && zcat "$WORKING_DIR/$DBName.sql.gz" | mysql $MYSQL_OPTIONS \
+                    && echo "ok" || echo "ERROR !"
+            ;;
+        esac
+    done
+
+echo "Starting services"
+    for Service in $DEP_SERVICES; do
+        echo " * $Service"
+        service $Service start
+    done
+
+echo "Operation ended successfully"

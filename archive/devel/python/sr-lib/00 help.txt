@@ -1,0 +1,9 @@
+# help with python in interpreter
+help(): allgemeine Hilfe zu Python
+help(obj): Hilfe zu einem Objekt, z.B. einer Funktion oder
+ Modul
+dir(): alle belegten Namen
+dir(obj): alle Attribute eines Objekts
+
+in shell: pydoc "module"
+

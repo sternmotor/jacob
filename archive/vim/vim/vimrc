@@ -1,0 +1,184 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" FEATURES
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" see https://github.com/derekwyatt/vim-config/blob/master/vimrc
+" http://net.tutsplus.com/articles/general/top-10-pitfalls-when-switching-to-vim/
+" Do not miss Derek Wyatts cents on vim (youtube)
+" vim indents with 4 spaces when pressing TAB
+" undo history is preserved over vim restarts
+"   ,n toggle line numbering on/off/relative
+"   ,m toggle terminal mouse insert mode
+"   ,t toggle tagbar (programmers view on classes functions variables)
+"   CTRL-x execute script code in preview window, <CTRL-c> to close window
+"   CTRL-i insert just a single letter
+
+" TODO:
+" * markdown integration http://daringfireball.net/projects/markdown/
+" * evaluate number of available colors and choose according colorscheme
+" * find good light color scheme for 256 colors and 16 colors (powershell)
+" * ,n: switch no/light/dark color scheme
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" PLUGIN loader 
+    set nocompatible
+    execute pathogen#infect()
+    runtime! plugin/sensible.vim
+
+" OS DETECTION
+    if has('macunix')
+        source vimrc.macos
+    elseif has('unix') && !has('macunix') && !has('win32unix')  
+        source /etc/vim/vimrc.debian
+    else
+        source vimrc.windows
+    endif
+
+" MOUSE, GUI, UNDO, SHELL SETUP
+    if &t_Co > 2 || has("gui_running") " more than 2 colors available, fine
+        syntax on   " file type depending syntax highlighting
+        set hlsearch
+    endif
+
+    let mapleader=','   " mapleader: use like ":map <leader>n :new<cr>"
+    let g:mapleader=','
+
+    " toggle paste mode - most extensions do not work in nopaste mode but
+    " mouse inserting does. no problem for vi gui but under xterm/putty etc.
+    nnoremap <leader>p :set invpaste paste?<CR>
+    set pastetoggle=<leader>p
+
+    " mouse mode nv: terminal mode in insert mode
+    set mouse=nv
+
+" FILE HANDLING, BACKUP AND HISTORY
+"
+    set encoding=utf-8
+    set noautoread  " do not automatically read a file that has changed on disk
+    set noautowrite " do not automatically save before :next, :make etc
+
+    " Make sure directory exists, already
+    if !isdirectory(&viewdir)
+        call mkdir(&viewdir, "p")
+    endif
+
+    " backups
+    set backup
+    if has('persistent_undo')
+        set undofile                " So is persistent undo ...
+        set undoreload=10000        " Maximum number lines to save for undo
+    endif
+
+    " undo and history
+    set undolevels=500 " Number of undo levels.
+    set history=500    " Long undo history
+
+" INDENTING
+    " see http://vim.wikia.com/wiki/Indenting_source_code
+    filetype plugin indent on 
+
+    " stop shifting comments to begin of line when smartindent is on
+    inoremap # X<c-h>#
+
+    " Copy the indentation from the previous line, when starting a new line
+    " For file type based indentation, don't set 'smartindent' or 'cindent' 
+    set nosmartindent
+    set nocindent
+    set autoindent  
+
+    " indent with spaces
+    set expandtab       " Always insert 'softtabstop' amount of space characters
+    set shiftwidth=4    " Affects what happens when you press >>, << or ==
+    set tabstop=4       " What happens when you press the <TAB> or <BS> keys
+
+
+" SEARCH
+    " When 'ignorecase' and 'smartcase' are both on, if a pattern contains an
+    " uppercase letter, it is case sensitive, otherwise, it is not.
+    set ignorecase
+    set smartcase
+
+
+" EDIT AND FORMAT OPTIONS
+    " enable file type specific indenting
+    filetype plugin indent on
+
+    " jump to the last position when reopening a file
+    autocmd BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$")
+    \| exe "normal g'\"" | endif
+
+    " vim-shebang detection of filetype 
+    autocmd BufNewFile,BufRead,InsertEnter,InsertLeave * filetype detect
+    " set filetype=markdown for all .md files
+    autocmd BufNewFile,BufRead,InsertEnter,InsertLeave *.md set filetype=markdown
+
+    " allow cursor to move freely in block mode
+    set virtualedit=block 
+
+    " Select all, cut, copy, paste 
+    nnoremap <C-A> ggVG 
+"    vnoremap <C-X> "+x 
+"    vnoremap <C-C> "+y 
+"    nnoremap <C-V> "+gP 
+"    cnoremap <C-V> <C-R>+ 
+"    exe 'inoremap <script> <C-V>' paste#paste_cmd['i'] 
+"    exe 'vnoremap <script> <C-V>' paste#paste_cmd['v'] 
+
+
+" STATUSBAR AND 80-CHAR COLUMN
+"    set cursorline                  " Highlight current line
+"    if exists("&colorcolumn")
+"        set colorcolumn=79
+"        highlight ColorColumn ctermfg=15  guifg=#ffffff ctermbg=239 guibg=#4e4e4e
+"    endif
+
+    " status line
+    set statusline=[%n]\ %F\ %M%R%H\ \ %y\ \ %p%%%=Line:%l/%L\ \ Column:%c
+
+" RELATIVE LINE NUMBERING: toggle via leader-n
+
+    nnoremap <silent> <leader>n :call ToggleNumbering()<CR>
+    let g:numbering = 0
+    function! ToggleNumbering()
+        if g:numbering == 0
+            set numberwidth=1               " relative line numbers on
+            set number
+            set relativenumber
+            let g:numbering = 1
+        elseif g:numbering == 1
+            set numberwidth=4
+            set norelativenumber
+            let g:numbering = 2
+        else
+            set nonumber
+            let g:numbering = 0
+        endif
+    endfunction
+
+" PROGRAMMERS CORNER 
+
+    " at first enter-hit, start sourcecode in editor, at second 
+    let g:buffer_runs = 0
+    function RunBuffer() 
+        if g:buffer_runs == 0
+            " detect filetype of new files which have not been saved to disk, yet
+            filetype detect
+            " run that buffer content loading os-dependent interpreter
+            if RunOSDependent() == 'started'
+                " set the output window as the current previewwindow
+                setlocal previewwindow ro nomodifiable nomodified
+                " go back into the original window
+                wincmd p
+                let g:buffer_runs = 1
+            endif
+        else
+            pclose!
+            echom 'Finished running buffer code'
+            let g:buffer_runs = 0
+        endif
+    endfunction
+
+    " initiate code execution: Press Enter in normal mode
+    "map  <C-space>       :call RunBuffer()<CR>
+    map  <F9>       :call RunBuffer()<CR>
+    imap  <F9>       <ESC>:call RunBuffer()<CR><i>
+

@@ -1,0 +1,60 @@
+#!/bin/bash
+# start mysql session interactively, run mysql commands or execute commands
+# from stadin (e.g. mysql dump recovery)
+LANG=C          # avoid errors due to localized command output
+#set -o nounset  # avoid using non initialised variables (rm -rf /$dir)
+set -o errexit  # exit the script at non-true return value
+
+CREDENTIAL_FILE='/etc/mysql/debian.cnf'
+OPTIONS="--defaults-extra-file="$CREDENTIAL_FILE" --default-character-set=utf8 "
+if [ -t 0 ]; then
+    run_mysql() {
+        mysql $OPTIONS "$@"
+    }
+else
+    run_mysql() {
+        cat - | mysql $OPTIONS "$@"
+    }
+fi
+
+# get mysql_host mysql_user mysql_pass 
+if [[ -z "${@:-}" ]] && [ -t 0 ] 
+then
+    # start interactive session
+    echo "Usage: $( basename $0 ) [-D DB] [\"MYSQL COMMAND;\" ]"
+    echo "Runs mysql client with debian-sys-maint credentials" 
+    echo "Insert \\G before ';' to enable vertical output"
+    echo "Example: $( basename $0) phpmyadmin \"SHOW TABLES;\" "
+    echo "Example: $( basename $0) \"SHOW DATABASES;\" "
+    echo "No arguments given, loggin you in to mysql root ..."
+    echo
+    run_mysql
+else
+    # log in to database ... 
+    if [[ "${1:-}" == "-D" ]]
+    then
+        db="$2"
+        shift 2
+        if [ -z "${@:-}" ]
+        then
+            # ... interactively or ...
+            run_mysql -D "$db" 
+        else
+            # ... starting given mysql command or ...
+            Cmd="$@"
+            run_mysql -D "$db" --batch --silent -e "$Cmd"
+        fi
+    else
+        # ... run given commands at mysql root
+        Cmd="$@"
+        if [ -t 0 ]
+        then
+            run_mysql --batch --silent -e "$Cmd"
+        else
+            if [ ! -z "$CMD" ]; then
+                echo "STDIN data detected, ignoring command line" 1>&2
+            fi
+            run_mysql 
+        fi
+    fi
+fi

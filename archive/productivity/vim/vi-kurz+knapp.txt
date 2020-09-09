@@ -1,0 +1,115 @@
+
+r vi
+
+
+Die Bedienung des vi ist etwas gewöhnungsbedürftig. Er wird an dieser Stelle anderen Editoren vorgezogen, weil er zum einen auf jedem UNIX-ähnlichen Betriebssystem zur Verfügung steht und bei Linux zum standardmäßigen Installationsumfang gehört; zum anderen, weil seine Bedienung eindeutig ist und dadurch in der Regel keine Missverständnisse auftreten. Außerdem: wenn nichts geht, geht vi immer noch. Die nun folgende Kurzanleitung sollte Sie in die Lage versetzen, mit Hilfe des vi z. B. diverse Konfigurationsdateien zu editieren.
+
+
+Der vi kennt drei Betriebsarten (Modi): Im Befehlsmodus command mode wird jeder Tastendruck als Teil eines Befehls interpretiert. Im Einfügemodus insert mode werden Tastatureingaben als Text interpretiert. Im Komplexbefehlsmodus last line mode geben Sie komplexere Befehle in der letzten Zeile ein.
+
+
+Die wichtigsten Befehle des Befehlsmodus sind:
+
+
+Tabelle 24.1. Einfache Befehle des Editors vi
+
+
+ESC
+wechselt in den komplexen Befehlsmodus.
+
+
+i
+wechselt in den Eingabemodus (Zeichen werden an der aktuellen Cursorposition eingegeben).
+
+
+a
+wechselt in den Eingabemodus (Zeichen werden nach der aktuellen Cursorposition eingegeben).
+
+
+A
+wechselt in den Eingabemodus (Zeichen werden am Ende der Zeile angehängt).
+
+
+R
+wechselt in den Eingabemodus (überschreibt den alten Text).
+
+
+r
+wechselt zum Überschreiben eines einzelnen Zeichens in den Eingabemodus.
+
+
+s
+wechselt in den Eingabemodus (das Zeichen, auf dem der Cursor steht, wird durch die Eingabe überschrieben).
+
+
+C
+wechselt in den Eingabemodus (der Rest der Zeile wird durch den neuen Text ersetzt).
+
+
+o
+wechselt in den Eingabemodus (nach der aktuellen Zeile wird eine neue Zeile eingefügt).
+
+
+O
+wechselt in den Eingabemodus (vor der aktuellen Zeile wird eine neue Zeile eingefügt).
+
+
+x
+löscht das aktuelle Zeichen.
+
+
+dd
+löscht die aktuelle Zeile.
+
+
+dw
+löscht bis zum Ende des aktuellen Worts.
+
+
+cw
+wechselt in den Eingabemodus (der Rest des aktuellen Worts wird durch die Eingabe überschrieben).
+
+
+u
+nimmt den letzten Befehl zurück.
+
+
+J
+hängt die folgende Zeile an die aktuelle an.
+
+
+.
+wiederholt den letzten Befehl.
+
+
+:
+wechselt in den Komplexbefehlsmodus.
+
+
+Allen Befehlen kann eine Zahl vorangestellt werden, die angibt, auf wie viele Objekte sich der folgende Befehl beziehen soll. So können durch Eingabe von 3dw drei Wörter auf einmal gelöscht werden. Durch Eingabe von 10x erreicht man das Löschen von zehn Zeichen ab der Cursorposition, 20dd löscht 20 Zeilen.
+
+
+Die wichtigsten Befehle des Komplexbefehlsmodus:
+
+
+Tabelle 24.2. Komplexe Befehle des Editors vi
+
+
+:q!
+verlässt vi, ohne Änderungen zu speichern
+
+
+:w dateiname
+speichert unter dateiname
+
+
+:x
+speichert die geänderte Datei und verlässt den Editor
+
+
+:e dateiname
+editiert (lädt) dateiname
+
+
+:u
+nimmt den letzten Editierbefehl zurück

@@ -1,0 +1,85 @@
+alias ct='column -t' check mount | ct
+
+
+
+vnstat is console-based network traffic monitor. dnstop is console tool to analyze DNS traffic. tcptrack and iftop commands displays information about TCP/UDP connections it sees on a network interface and display bandwidth usage on an interface by host respectively.
+
+## All of our servers eth1 is connected to the Internets via vlan / router etc  ##
+alias dnstop='dnstop -l 5  eth1'
+alias vnstat='vnstat -i eth1'
+alias iftop='iftop -i eth1'
+alias tcpdump='tcpdump -i eth1'
+alias ethtool='ethtool eth1'
+ 
+# work on wlan0 by default #
+# Only useful for laptop as all servers are without wireless interface
+alias iwconfig='iwconfig wlan0'
+
+
+## pass options to free ##
+alias meminfo='free -mt'
+ 
+## get top process eating memory
+alias psmem='ps auxf | sort -nr -k 4'
+alias psmem10='ps auxf | sort -nr -k 4 | head -10'
+ 
+## get top process eating cpu ##
+alias pscpu='ps auxf | sort -nr -k 3'
+alias pscpu10='ps auxf | sort -nr -k 3 | head -10'
+
+
+# bash completition
+if [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+bind "set completion-ignore-case on" # note: bind used instead of sticking these in .inputrc
+bind "set bell-style none" # no bell
+bind "set show-all-if-ambiguous On" # show list automatically, without double tab
+
+
+prompt
+PROMPT_DIRTRIM=6
+RESET="\[\017\]"
+BLUE="\[\033[0;34m\]"
+NORMAL="\[\033[0m\]"
+RED="\[\033[31;1m\]"
+YELLOW="\[\033[33;1m\]"
+WHITE="\[\033[37;1m\]"
+SMILEY="${WHITE}:)${NORMAL}"
+FROWNY="${RED}:(${NORMAL}"
+SELECT="if [ \$? = 0 ]; then echo \"${SMILEY}\"; else echo \"${FROWNY}\"; fi"
+
+# Throw it all together
+PS1="${RESET}${BLUE}[\t] ${YELLOW}[\u:\h \w]${NORMAL} \`${SELECT}\` ${YELLOW}>${NORMAL} "
+SELECT="if [ \$? = 0 ]; then echo \"${SMILEY}\"; else echo \"${FROWNY}\"; fi"
+# Throw it all together 
+PS1="${RESET}${YELLOW}\h${NORMAL} \`${SELECT}\` ${YELLOW}>${NORMAL} "
+
+PS1="$BLUE[\$(date +%H:%M)]
+
+
+export HISTFILESIZE=20000
+export HISTSIZE=10000
+shopt -s histappend
+
+PROMPT_COMMAND='history -a'
+
+
+root@sternmotor.net ~ # !!
+root@sternmotor.net ~ # !-3
+
+o
+
+
+profile
+export GREP_OPTIONS='--color=auto'
+
+
+if [ "$TERM" != "dumb" ]; then
+    if [ $(uname) == "Darwin" ]; then
+       alias ls='ls -G'
+    else
+       eval "$(dircolors -b)"
+       alias ls='ls --color=auto'
+    fi
+fi

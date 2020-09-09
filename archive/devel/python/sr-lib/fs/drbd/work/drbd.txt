@@ -1,0 +1,12 @@
+# drbd tools
+
+dd create
+remove
+transfer
+mount 
+umount
+status
+status_all
+up
+
+down

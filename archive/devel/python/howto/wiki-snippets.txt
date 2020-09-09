@@ -1,0 +1,131 @@
+====== Python Snippets ======
+
+===== Script Structures, Error Handling =====
+===== Data Structures and Logic, Math =====
+===== Text Files, Unicode, Strings and Regexp =====
+
+
+===== Filesystem, Date, Time =====
+
+===== Config and Command Line Options =====
+==== Config file comments ====
+
+How to format comments, defaults and explanations for config file items
+<file>
+#
+# Set config file format version.
+#
+ConfigFileVersion = "2.0"
+
+#
+# Enable or disable support for user profiles:
+#
+# 1: Enabled. The NX server allows the NX session to start
+#    according to the set of rules specified for the system
+#    or on a per-user basis.
+#
+# 0: Disabled. The NX server starts the session without apply-
+#    ing any rules.
+#
+# The administrator can configure access to applications and nodes
+# by creating a specific profile for the NX system, which will be
+# applied to any user starting a session on this server, or by def-
+# ining profiles on a per-user basis. Any profile consists of a set
+# of rules specifying what the user can or can't do in the session.
+#
+#EnableUserProfile = "0"
+</file>
+===== Logging, Mail and Messages =====
+===== System Command Execution, Operating System =====
+
+==== determine linux version 32/64 bit ====
+<code>
+def plat():
+    if sys.platform.lower().startswith('linux'):
+        arch = platform.machine()
+        if (arch[0] == 'i' and
+            arch[1].isdigit() and
+            arch[2:4] == '86'):
+            plat = "x86"
+        elif arch == 'x86_64':
+            plat = arch
+        else:
+            FatalVisibleError("Platform not supported")
+        return "lnx.%s" % plat
+    else:
+        FatalVisibleError("Platform not supported")
+    return plat
+</code>
+
+===== Daemon, Threads, Parallel Processing =====
+===== Databases, Net, RPC, Users, Groups =====
+
+
+<code>
+
+#-------#----------------------------------------------------------------------------
+def sort_ipv4_list(ipv4_list):
+#----------------------------------------------------------------------------
+    """Sort an IP address list."""
+    return sorted(
+        ipv4_list,
+        key=lambda ip: long(''.join(["%02X" % long(i) for i in ip.split('.')]), 16)
+    )
+
+#----------------------------------------------------------------------------
+def is_ipv4(address):
+#----------------------------------------------------------------------------
+    import socket
+    try:
+        socket.inet_pton(socket.AF_INET, address)
+    except AttributeError: # no inet_pton here, sorry
+        try:
+            socket.inet_aton(address)
+        except socket.error:
+            return False
+        else:
+            return address.count('.') == 3
+    except socket.error: # not a valid address
+        return False
+    else:
+        return True
+---------------------------------------------------------------------
+def is_ipv6(address):
+#----------------------------------------------------------------------------
+    import socket
+    try:
+        socket.inet_pton(socket.AF_INET6, address)
+        return True
+    except socket.error: # not a valid address
+        return False
+
+#----------------------------------------------------------------------------
+def is_email(email):
+#----------------------------------------------------------------------------
+    mail_pattern = re.compile(
+        '''^[\w\.-]+@[\w\.-]+\.\w{2,4}$''',
+        re.UNICODE | re.VERBOSE
+    )
+    try:
+        mail_pattern.search(email.strip()).group()
+        return True
+    except AttributeError:
+        return False
+
+#----------------------------------------------------------------------------
+def is_url(url):
+#----------------------------------------------------------------------------
+    url_pattern = re.compile(
+        '''
+        ^
+        http[s]?://
+        (?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+
+        $
+        ''',
+        re.UNICODE | re.VERBOSE
+    )
+    try:
+        return url_pattern.search(url.strip()).group()
+    except AttributeError:
+        return False
+</code>

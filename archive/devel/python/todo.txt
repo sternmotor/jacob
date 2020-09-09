@@ -1,0 +1,8 @@
+Einarbeiten:
+    data.py
+    csv.py
+    flatten.py?
+    sr-Zeit Kram
+
+    Umbau auf Zahlen und Leerzeichenfreie Dateinamen wie bei sr
+    Abgleich Namen sr-python und sr-Linux und sr-bash

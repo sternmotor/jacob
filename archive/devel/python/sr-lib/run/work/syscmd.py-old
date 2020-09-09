@@ -1,0 +1,249 @@
+#!/usr/bin/python
+
+"""
+ DESCRIPTION  wrapper for subprocess, adapted to linux shell needs
+ 
+ USAGE        call this script with -h or --help option
+       
+ CHANGELOG    
+    10-06-10    * simplified interface: no printing of stdout, stderr
+                  anymore,
+                * exceptions are raised when error code > 0
+    09-06-10    * removed run_quick
+                * added timeout
+    09-03-23    * release for python
+
+ TODO
+    * time limit does not work anymore since yield-generator was introduced
+      as interface for output handling 
+ 
+ THANKS TO
+
+"""
+
+
+#=============================================================================
+# modules import, script initialisation
+#=============================================================================
+
+__all__ = [
+    'syscmd',
+    'SysCmdError', 'SysCmdExitError', 'SysCmdBreakError', 'SysCmdTimeoutError',
+]
+
+import os           # check path
+import sys          # for writing to stderr
+from   subprocess import Popen, PIPE
+
+EOL = '\n'
+
+import logging
+log = logging.getLogger( __name__ )
+from pt.data  import validate   # data validator
+
+#-----------------------------------------------------------------------------
+# main class for running shell scripts
+#-----------------------------------------------------------------------------
+class SysCmdError(Exception):
+    """Errors initializing script or command execution."""
+    pass
+
+class SysCmdExitError(SysCmdError):
+    """Bad exit code at command execeution."""
+    pass
+
+class SysCmdBreakError(SysCmdError):
+    """User termination in running shell commands or scripts."""
+    pass
+
+class SysCmdTimeoutError(SysCmdError):
+    """Timeout in running shell commands or scripts."""
+    pass
+
+
+#def syscmdpipe
+
+
+def syscmd( cmd, expand=True, timeout=None, stdin=None, pipe=False, env=None ):
+    """
+    Wrapper for subprocess call spicing it up by implementing timeout , 
+    input and output channel handling.
+
+    Return value: a genererator for stdout and stderr messages and error code
+
+
+    INPUT
+    cmd:    : array or string containing system command to run, first part of
+              cmd is getting checked if it is executable
+    stdin   : string (evtl. multiline) which is passed to cmd's stdin 
+    timeout : timeout for running system command in seconds
+    expand  : True: enable shell parameter expansion( wildcards)
+    pipe    : True: return stdout and stderr
+              False: return None, None and print stderr, stdout to Terminal
+    env     : true: keep environment settings
+
+    EXAMPLES:
+    for stdout, stderr in syscmd( "ls /etc/certs/*", expand=True, pipe=True ):
+        print stdout
+    b)
+    syscmd( "ls /etc/certs/*", expand=True)
+
+    In case a system error occurs, the last stderr messages and error code
+    are stored in message variable of exception SysCmdExitError
+
+    try:
+        for stdout, stderr in syscmd( "ls /etc/certs/*", expand=True, pipe=True ):
+            print stdout
+    except SysCmdExitError, emsg:
+        log.error( "error, code is %d and text %s" % ( emsg[0], emsg[1] )
+    """
+
+    # prepare cmd array
+    if   type( cmd ) is type(''):   # string
+        cmd_exec = cmd.strip().split()[0]
+        if expand is False:
+            cmd = cmd.strip().split()
+    elif type( cmd ) is type([]):   # array
+        cmd_exec = cmd[0]
+        if expand is True:
+            cmd = ' '.join( cmd )
+    else:                           # zombie
+        raise SysCmdError(
+            "First parameter must be string or array, got type %s"
+            "for cmd '%s'" % (type(cmd), cmd_exec)
+        )
+
+    if cmd_exec is None:
+        raise SysCmdError(
+            "Executable not found: '%s'" % cmd
+        )
+
+    # run command, run iterator in case no pipe is defined
+    if ( timeout is None ) or ( timeout == 0 ) or (timeout == False):
+        log.debug( "Starting shell command '%s'" % cmd )
+        # return iterator
+        if pipe is True:
+            return _start( cmd, expand, stdin, pipe, env )
+        else:
+            for out,err in _start( cmd, expand, stdin, pipe, env ):
+                pass
+    else:
+        try:
+            validate.is_integer( timeout)
+        except validate.VdtTypeError, emsg:
+            raise SysCmdError(
+                "Timeout parameter needs to be an integer, got '%s'" 
+                % timeout
+            )
+#        # import timeout stuff
+#        from pt.threading.timeout import timelimited, TimeLimitExpired
+#
+#        # run it 
+#        log.debug( "Starting %s, timeout %s seconds" % ( cmd, timeout ) )
+#        try:
+#            return timelimited( timeout, _start, cmd, expand, stdin, pipe, env, )
+#
+#        except TimeLimitExpired:
+#            emsg = (
+#                "timelimit (%s sec) reached for command %s" \
+#                % ( timeout, cmd )
+#            )
+#            log.warning( emsg )
+#            raise SysCmdTimeoutError( emsg )
+#        except ValueError, emsg:
+#            emsg = "time limit (%s sec) for system command '%s' is invalid" \
+#                % ( timeout, cmd )
+#            log.error( emsg )
+#            raise SysCmdError( emsg )
+
+
+
+def _start( cmd, expand, stdin, pipe, env ):
+    # stdin
+    if stdin is None:
+        stdin_handler = None
+    else:
+        stdin_handler = PIPE
+
+    # initialize command
+    try:
+        cmd_handler = Popen(
+            cmd,
+            stdin  = stdin_handler,
+            stdout = PIPE,
+            stderr = PIPE,
+            shell  = expand,
+#            bufsize = 1 ,       # 1=line buffered
+#            universal_newlines = True,
+#            env = env,
+#            close_fds = False ,
+            # see http://docs.python.org/library/subprocess.html
+                # close_fds = True: close all file descriptors (daemon mode)
+                # shell = True: enables shell parameter expansion
+                # let stderr go to stdout: stderr = STDOUT 
+        )
+    except OSError, emsg:
+        emsg = "OS Error calling '%s'\n%s" % ( ' '.join(cmd), emsg )
+        log.error( emsg )
+        raise SysCmdError( emsg )
+    except ValueError:
+        emsg = "Internal error: subprocess called with wrong arguements"
+        log.error( emsg )
+        raise SysCmdError( emsg )
+    except KeyboardInterrupt:
+        raise SysCmdBreakError( "User break, exiting" )
+
+    if   stdin is None :
+        # yield lines of output until command finished
+        err_buffer = ''
+        while True:
+            out = cmd_handler.stdout.readline()
+            err = cmd_handler.stderr.readline()
+
+            if not out and not err and not cmd_handler.poll() is None:
+                break
+
+            # store error messages
+            if out:
+                out = out.rstrip()
+                err_buffer = ''
+            if err:  
+                err = err.rstrip()
+                err_buffer += "%s\n" % err
+
+            # return or print message
+            if pipe:
+                yield( [ out, err ] )
+            else:
+                if out:
+                    sys.stdout.write( "%s\n" % out )
+                if err:
+                    sys.stderr.write( "%s\n" % err )
+
+        # check returncode at end of loop
+        _check_errorcode( cmd, cmd_handler )
+
+    elif stdin is not None :
+        # process pipe
+        out, err = cmd_handler.communicate( stdin )
+        if pipe:
+            yield( [ out, err ] )
+        else:
+            if out: 
+                sys.stdout.write( "%s\n" % out ) 
+            if err:
+                sys.stderr.write( "%s\n" % err ) 
+
+        # check returncode at end of communicate
+        _check_errorcode( cmd, cmd_handler )
+
+
+
+def _check_errorcode( cmd, cmd_handler ):
+    ecode = cmd_handler.poll()
+
+    if ecode > 0:
+        log.error( "Bad exit code '%s' running '%s'" % ( ecode, cmd ) )
+        raise SysCmdExitError( ( ecode,  err ) )
+    else:
+        log.debug( "Exit code ok" )

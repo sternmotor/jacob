@@ -1,0 +1,174 @@
+#!/usr/bin/python
+
+import sys
+import os
+try:
+    import read_config 
+except ImportError:
+    from drbd import read_config
+
+
+
+PROC_FILE = '/proc/drbd'
+
+class DrbdStatusError(Exception):
+    pass
+
+def loadResources( config_file, host ):
+    config = []
+    try:
+        for data in read_config.getResources(config_file, host):
+            config.append(data)
+
+    except DrbdConfigError, emsg:
+        raise DrbdStatusError(
+            "Could not load drbd resource definitions!\n%s" % emsg
+        )
+    return config
+
+
+def getProcLine():
+    """print lines from /proc/drbd, concentate for each device"""
+
+    # try to open proc messages
+    try:
+        fh_proc = open( PROC_FILE )
+    except Exception, emsg:
+        raise DrbdStatusError(
+            "could not open drbd proc file '%s'!\n%s"
+            % ( PROC_FILE , emsg )
+        )
+
+    for proc_line in fh_proc:
+        if proc_line.find('cs:') > 0:
+            # skip reading status in case device is unconfigured
+            if 'Unconfigured' in proc_line:
+                yield proc_line
+                continue
+
+            # grap the C r--- part of the first status line, store as "ss:"
+            s_state  = "ss:%s " % '-'.join( proc_line.split()[4:] )
+
+            # read next 3 lines
+            yield proc_line + s_state + fh_proc.next() + fh_proc.next() + fh_proc.next()
+
+
+
+def getDrbdStatus( config_file, host ):
+
+    drbd_resources = loadResources( config_file, host )
+
+    # find maximum print length for ressource name
+    max_res_name_length = 0
+    for drbd_resource in drbd_resources:
+        if len(drbd_resource['resource']) > max_res_name_length:
+            max_res_name_length = len(drbd_resource['resource'])
+
+    # print resource status
+    for current_line in getProcLine():
+        params = {}
+        items  = current_line.split()[1:]
+
+        # first parameter: device id
+        params['device_id'] = int ( current_line.partition(':')[0] )
+
+        # get all other parameters, after setting  default values
+        cs = 'Unknown'
+        st = 'Unknown/Unknown'
+        ds = 'Unknown/Unknown'
+        ua = -1
+        pe = -1
+        resync = 'Unknown'
+        ss = 'Unknown'
+        for item in items:
+            key, nix, val = item.partition(':')
+            try:
+                exec("%s = '%s'" % ( key, val ) )
+            except SyntaxError:
+                pass
+        # sort drbd output to some more readable names
+        params['conn_state']  = cs                   # drbd connection state
+        params['role_loc']    = st.split('/')[0]     # local role
+        params['role_rem']    = st.split('/')[1]     # remote role
+        params['disc_state_loc'] = ds.split('/')[0]  # local disc state
+        params['disc_state_rem'] = ds.split('/')[1]  # remote disc state
+        params['pending_loc'] = int(ua)              # requests pending here
+        params['pending_rem'] = int(pe)              # requests pending local
+        params['sync_state']  = resync               # progress meter when syncing
+        params['short_state'] = ss      # workaround, see getProcLine()
+
+        # find drbd resource from config for this line
+        for drbd_resource in drbd_resources:
+            if drbd_resource['dev_id'] ==  params['device_id']:
+                params['resource_name'] = drbd_resource['resource']
+                params['lvm_path']      = drbd_resource['disk']
+                break
+        yield  params
+
+        # pe (pending). Number of requests sent to the partner, but that have not yet been answered by the latter.
+        # oos (out of sync). Amount of storage currently out of sync; in Kibibytes
+        # ua (unacknowledged). Number of requests received by the partner via the network connection, but that have not yet been answered. 
+        #  resync: used:
+
+def displayStatus(config_file, host):
+
+    NORMAL  = '\033[0m'
+    GREEN   = '\033[32m'
+    RED     = '\033[31m'
+    PURPLE  = '\033[35m'
+
+
+    for params in getDrbdStatus(config_file, host):
+        # device
+        try:
+            print "%-3d %-12s" % ( params['device_id'], params['resource_name'] ),
+        except KeyError:
+            print "%-3d %sdevice not found in drbd.conf%s" % (params['device_id'], RED,NORMAL )
+            continue
+        # connection state
+        if params['conn_state'] == 'Connected':
+            print "%-11s" % params['conn_state'],
+        elif params['conn_state'] == 'WFConnection':
+            print "%s%-11s%s" % ( PURPLE, "WaitConn", NORMAL),
+        else:
+            print "%s%-11s%s" % ( RED, params['conn_state'], NORMAL ),
+        # roles
+        if  params['role_loc'] == 'Primary':
+            print "%s%-9s%s" % ( GREEN , params['role_loc'], NORMAL ),
+        elif params['role_loc'] == 'Secondary':
+            print "%-9s" % params['role_loc'],
+        else:
+            print "%s%-9s%s" % ( RED   , params['role_loc'], NORMAL ),
+    
+        print ":",
+
+        if params['role_rem'] == 'Primary':
+            print "%s%-10s%s" % ( GREEN , params['role_rem'], NORMAL ),
+        elif params['role_rem'] == 'Secondary':
+            print "%-10s" % params['role_rem'],
+        else:
+            print "%s%-10s%s" % ( RED   , params['role_rem'], NORMAL ),
+        # disc states
+        if  params['disc_state_loc'] == 'UpToDate':
+            print "%-8s" % params['disc_state_loc'],
+        else:
+            print "%s%-8s%s" % ( RED, params['disc_state_loc'], NORMAL ),
+    
+        print ":",
+
+        if  params['disc_state_rem'] == 'UpToDate':
+            print "%-8s" % params['disc_state_rem'], 
+        else:
+            print "%s%-8s%s" % ( RED, params['disc_state_rem'], NORMAL ),
+
+        print  params['short_state'], params['sync_state']
+    #    print "-----"
+
+if __name__ == "__main__":
+    import sys
+    sys.path.pop(0)
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+    sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
+
+
+    displayStatus('/etc/drbd.conf', 'host2' )

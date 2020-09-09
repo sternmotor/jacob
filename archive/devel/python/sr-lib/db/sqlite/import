@@ -1,0 +1,12 @@
+try:
+   import sqlite3 as sqlite # python 2.5
+except ImportError, emsg1:
+   try:
+      from pysqlite2 import dbapi2 as sqlite
+   except ImportError, emsg2:
+        raise ImportError( 
+            "Could not load sqlite version 3 or 2!:\n%s\n%s"
+            % ( emsg1, emsg2)
+        )
+
+

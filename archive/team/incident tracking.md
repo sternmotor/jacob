@@ -1,0 +1,5 @@
+# incident tracking
+
+* What happened, what I tried, what I eventually found was the root cause, how I fixed it, and what I'm changing to prevent a repeat. This has two big advantages. First, the obvious one is that when things act up I can sometimes find details on a previous incident that I don't remember very well. The second and I think even greater advantage, though, is that it forces me to actually think seriously about the root cause and preventative measures every single time, instead of just fixing the immediate problem and then going on to the next thing in a rush.
+* that lists things that I've has to fix, each with a symptom list (including error codes and log output so it's easy to search), root cause where known, steps to fix, and date+time of every known occurrence. Partially helpful because some errors reoccurr.
+* I track what I worked on in a text file, and more importantly, what decisions related to my business I made on this day. If something comes up that requires a bit of thought, I simply “discuss” it in free text form.

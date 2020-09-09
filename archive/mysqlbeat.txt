@@ -1,0 +1,117 @@
+# see docs folder!
+
+
+sudo install golang glide git
+export GOPATH=~/go && export GOROOT=/usr/lib/golang \
+&& cd ~/go/src/github.com/adibendahan \
+&& git clone https://github.com/adibendahan/mysqlbeat \
+&& cd mysqlbeat \
+&& git checkout 1.0.0 \
+&& echo "glide update" 1>&2 \
+&& glide update --no-recursive \
+&& echo "make" 1>&2 \
+&& make
+
+
+
+sudo cp mysqlbeat /usr/bin \
+sudo mkdir /etc/mysqlbeat \
+sudo cp mysqlbeat.yml /etc/mysqlbeat/mysqlbeat.reference.yml 
+if [ ! -f /etc/mysqlbeat/mysqlbeat.yml ]; then
+    sudo cp mysqlbeat.yml /etc/mysqlbeat/mysqlbeat.yml
+fi
+
+mysqlbeat.yml /etc/mysqlbeat/mysqlbeat.reference.yml 
+
+cat << UNIT_END | sudo tee /etc/systemd/system/mysqlbeat.service > /dev/null
+[Unit]
+Description=MySQLBeat sends table contents to Logstash or directly to Elasticsearch.
+Documentation=https://github.com/adibendahan/mysqlbeat
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/mysqlbeat -c /etc/mysqlbeat/mysqlbeat.yml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+UNIT_END
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable mysqlbeat
+
+mysql
+GRANT REPLICATION CLIENT, PROCESS ON *.* TO 'mysqlbeat'@'127.0.0.1' IDENTIFIED BY 'mysqlbeat_pass';
+
+
+
+sudo systemctl start mysqbeat
+
+
+# insert data
+
+cat << 'SQL_END'  | mysql -D xres_tso_logbook
+INSERT INTO utility_cacheprovidertolog
+(`status`, message, thread_id)
+(
+    SELECT
+    'ALERT', 'mysqlbeat test', 90
+    FROM utility_cacheprovidertolog
+    LIMIT 1
+);
+SQL_END
+
+# encode password
+
+
+MariaDB [(none)]> select password('mysqlbeat_pass');
++-------------------------------------------+
+| password('mysqlbeat_pass')                |
++-------------------------------------------+
+| *3B0C2E6372D78FB03B852CC4D3C3FFF23641812A 
+
+# download rpm from https://github.com/adibendahan/mysqlbeat/releases/tag/1.0.0
+
+
+
+create user:
+create user 'mbeat'@'localhost' identified by 'mbeat_pass';
+GRANT SELECT ON xres_tso_logbook.* to 'mbeat'@'localhost';
+flush privileges;
+
+GRANT REPLICATION CLIENT, PROCESS ON *.* to 'mbeat'@'localhost';
+
+remove user:
+
+drop user 'mbeat'@'localhost'; 
+
+
+
+Python Beat:
+import logging
+import logstash
+import sys
+
+host = 'localhost'
+
+test_logger = logging.getLogger('python-logstash-logger')
+test_logger.setLevel(logging.INFO)
+test_logger.addHandler(logstash.LogstashHandler(host, 5959, version=1))
+# test_logger.addHandler(logstash.TCPLogstashHandler(host, 5959, version=1))
+
+test_logger.error('python-logstash: test logstash error message.')
+test_logger.info('python-logstash: test logstash info message.')
+test_logger.warning('python-logstash: test logstash warning message.')
+
+# add extra field to logstash message
+extra = {
+    'test_string': 'python version: ' + repr(sys.version_info),
+    'test_boolean': True,
+    'test_dict': {'a': 1, 'b': 'c'},
+    'test_float': 1.23,
+    'test_integer': 123,
+    'test_list': [1, 2, '3'],
+}
+test_logger.info('python-logstash: test extra fields', extra=extra)

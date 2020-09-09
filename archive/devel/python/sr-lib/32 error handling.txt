@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+try except:
+  keep try- code as short as possible (avoids masking bugs)
+
+#print original python backtrace
+class SubClassError()
+    """Error running (user-defined) subclass method"""
+
+def test():
+    a = 3/0
+
+def holla():
+    try:
+        test()
+    except BaseException, emsg:
+        import traceback
+        raise SubclassError((
+            'Error running test, message "%s"\n  > %s'
+            % (emsg ,'\n  > '.join(traceback.format_exc(3).splitlines()))
+        )
+
+holla()
+
+
+
+
+# exception handling
+"""
+Accessing a non-existent dictionary key will raise a KeyError exception.
+Searching a list for a non-existent value will raise a ValueError exception.
+Calling a non-existent method will raise an AttributeError exception.
+Referencing a non-existent variable will raise a NameError exception.
+Mixing datatypes without coercion will raise a TypeError exception.
+Importing a module that does not exist will raise an ImportError exception. 
+"""
+
+
+# example
+# wrapper module for getting a password from the user. Getting a password is accomplished differently on UNIX, Windows, and Mac OS platforms, but this code encapsulates all of those differences.
+
+
+# Bind the name getpass to the appropriate function
+try:
+     import termios, TERMIOS
+except ImportError:
+     try:
+          import msvcrt
+     except ImportError:
+          try:
+               from EasyDialogs import AskPassword
+          except ImportError:
+               getpass = default_getpass
+          else:
+               getpass = AskPassword
+     else:
+          getpass = win_getpass
+else:
+
+getpass = unix_getpass
+
+
+# each time you want to catch IOError OR
+# OSError together, just catch EnvironmentError, their common
+# baseclass!  It's rare (though not unheard of) to want to catch
+# them separately and distinctly.
+
+# I don't
+# think I've ever caught anything broader than StandardError not Bare Exceptions
+
+
+#Use EAFP instead of LBYL:
+#========================
+#    try:
+#        useappropriately(thefile)
+#    except ItWasWrong, howwasitwrong:
+#        dealwithwrongness()
+
+# You don't have to code a separate 'iswhatiwant' test -- what you DO want is
+# determined inherently by what 'useappropriately' tries to do.  No race 
+# conditions, no code that must duplicate the set of conditions to be checked
+# for, no duplicate work at runtime in terms of system calls to determine if 
+# a condition holds followed by system calls 
+
+
+# program a single "do this" operation, which will either fail, or atomically 
+# succeed-and-perform
+
+"""
+Locking
+=======
+> If race conditions are a problem shouldn't we be doing something like
+> 
+> while not havelockon(thefile):
+>         pass    # or sleep etc
+> useappropriately(thefile)
+> giveuplockon(thefile)
+> 
+> if we actually need to do something with/to thefile?
+
+I don't know, should we?  Will that lock lock all of the directories
+upwards from the file, all the way up to root, so that no permission
+change can occur that may invalidate whatever tests you're performing
+in the LBYL version -- just for example?  I've never seen any lock
+mechanism or convention that was as powerful as that -- and yet it
+would seem to be a very fundamental operation.
+
+On the other hand, simply trying to open the file for reading will
+either succeed or fail and (at least in the implementations I'm
+familiar with) if it succeeds it leaves you with a handle suitable
+for reading no matter what changes occur later on directories &c.
+"""
+
+
+# hand over error messages through an error chain:
+
+    raise ExampleError3( message3 )
+    ...
+    except ExampleError3, emsg:
+        raise ExampleError2( 
+            "message2"
+            "\n%s" % emsg 
+        )
+    ... 
+    except ExampleError2, emsg:
+        raise ExampleError( "message\n%s" % emsg )
+
+    except ExampleError, emsg:
+        print emsg
+    => 
+    message
+    message2
+    message3
+
+
+
+
+
+

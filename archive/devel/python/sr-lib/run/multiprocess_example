@@ -1,0 +1,39 @@
+#!/usr/bin/python
+#import pp
+
+
+import multiprocessing
+import time
+import pt.run
+
+sleep = 2
+
+
+print "number of cpu's: %s" % multiprocessing.cpu_count()
+
+
+def shell_command(sleep):
+    pt.run.Run( "sleep %s" % sleep  )
+
+
+
+
+childs = []
+for i in range(0,20):
+    print ( "Starting child process %s" % i)
+
+    new_child = multiprocessing.Process(target=shell_command, args=(sleep,), name = "Shell Prozess %s" % i)
+    childs.append( new_child )
+    new_child.start()
+
+def check_childs(childs):
+    alive = False
+    for child in childs:
+        print "%s alive: %s, exit code: %s, pid: %s" % ( child._name, child.is_alive(), child.exitcode, child.pid )
+        if child.is_alive():
+            alive = True
+    return alive
+
+while check_childs(childs):
+    time.sleep(1)
+
