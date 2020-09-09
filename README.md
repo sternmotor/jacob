@@ -8,6 +8,8 @@ for daily admin's work, centered on
 * automatisation: ansible, puppet
 * virtualization and high availability: hyperv, docker, drbd, cephalopods
 
+Most parts are not commited yet, this is a work under construction. 
+
 
 # Content Overview
 
