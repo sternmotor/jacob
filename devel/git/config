@@ -1,0 +1,10 @@
+# ~/.gitconfig
+[user]
+    name = Firstname Lastname
+    email = f.lastname@example.com
+[push]
+    # push branches manually and individually
+    default = simple
+[core]
+    # checkout EOL platform specific, push as CLRF
+    autocrlf = true

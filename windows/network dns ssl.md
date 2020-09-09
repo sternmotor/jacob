@@ -27,17 +27,13 @@ RDG connection setup
 
 Turn Firewall on /off in Powershell
 
-```
-Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
-Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
-```
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 
 Turn Firewall on /off via CMD
 
-```
-netsh advfirewall set allprofiles state off
-netsh advfirewall set allprofiles state on
-```
+    netsh advfirewall set allprofiles state off
+    netsh advfirewall set allprofiles state on
 
 Set up firewall policy
 ```

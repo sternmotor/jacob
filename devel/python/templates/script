@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# command line interface script:
+# * read config and command line options, 
+# * set up signal/error handling and cleanup
+# * invoke actions 
+
+"""
+Return dynamic inventory data (pulled freeipa instance or cache and specified
+in csv files) as ansible "dynamic inventory" or as combined human-readable 
+YAML data set. 
+"""
+
+
+# MODULES AND CONSTANTS
+
+
+import argparse
+import logging
+import os.path
+import sys
+import signal
+
+
+SCRIPT_DIR = os.path.split(sys.argv[0])[0]
+DEFAULT_CONFIG_FILE = os.path.join(SCRIPT_DIR, 'loader.yml')
+
+
+# COMANND LINE OPTIONS
+
+argparser = argparse.ArgumentParser(description=__doc__)
+
+argparser.add_argument( '-f', '--configfile', action='store',
+    default=DEFAULT_CONFIG_FILE, 
+    help="""config file tor read freeipa connection data and path 
+    configuration from"""
+)
+
+argparser.add_argument( '-v', '--verbose', action='count', default=0,
+    help="""script verbosity, -v: show progress, -vv: debug mode - pipe to 
+    "logger" for long running tasks"""
+)
+
+# mutually exclusive options: --refresh, --load
+cache_options = argparser.add_mutually_exclusive_group(required=False)
+
+cache_options.add_argument( '-r', '--refresh', action='store_true',
+    help="""pull data from freeipa, store in cache - this overrides any 
+    setting in loader.yml"""
+)
+
+cache_options.add_argument( '-l', '--load', action='store_true',
+    help="""load freeipa data from cache - this overrides any 
+    setting in loader.yml"""
+)
+
+
+# mutually exclusive commands: --check, --list, -print
+action_group = argparser.add_argument_group(title='commands')
+actions = action_group.add_mutually_exclusive_group(required=False) 
+
+actions.add_argument( '-c', '--check', action='store_true',
+    help="""validate data consistency - use this for monitoring database
+    health, eventually combine with --refresh option"""
+)
+
+actions.add_argument( '-p', '--print', action='store_true',
+    help="""analyse database, print whole database nicely as yaml - this is
+    the default action"""
+)
+
+actions.add_argument( '-i', '--list', action='store_true',
+    help="""analyse database, print ansible compatible JSON output"""
+)
+
+# clear help text display, parse command line
+for action_group in argparser._action_groups:
+    action_group._group_actions.sort(key=lambda x:x.option_strings[0])
+
+args = argparser.parse_args()
+
+
+# LOGGING
+
+log = logging.getLogger('main')
+logging.basicConfig(
+    level={0:30, 1:20, 2:10}[min(2, args.verbose)],
+    format={
+        0: 'Error: %(message)s',    # error, warning
+        1: '%(message)s',           # info
+        2: '%(levelname)-5s [%(name)s:%(lineno)s]: %(message)s' # debug
+    }[min(2,args.verbose)],
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+
+# SYSTEM SIGNAL HANDLING
+
+def exit_handler(signal, stackframe=None):
+    """Specify clean exit for break signals, user break or errors"""
+
+    log.debug('Received signal {}, cleanup and exit'.format(signal))
+    # ... put cleanup code here ...
+
+    sys.exit(signal)
+signal.signal(signal.SIGINT, exit_handler)
+signal.signal(signal.SIGTERM, exit_handler)
+
+
+# APPLICATION LOGIC
+
+try:
+
+    # handle action logic
+    if args.check:
+        log.debug('Nothing more to do, bye')
+    elif args.list:
+        log.info('list all')
+
+    # default action
+    else:
+        log.info('log.info all')
+
+
+# ERROR HANDLING, EXIT
+
+except lib.error.KnownError as msg:
+    log.error(msg)
+    exit_handler(os.EX_USAGE)
+
+except Exception:
+    log.error('Unexpected script error, debug info:', exc_info=True)
+    exit_handler(os.EX_SOFTWARE)
+
+else:
+    exit_handler(os.EX_OK)

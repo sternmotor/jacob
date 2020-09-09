@@ -15,24 +15,23 @@ Links:
 * [Systemd python inotify](https://pypi.python.org/pypi/sdnotify) and [SD Notify](https://www.freedesktop.org/software/systemd/man/sd_notify.html#)
 
 Unit file
-```
-Type=
-    * simple: ExecStart process is main process, running in foreground, not exiting (see oneshot)
-    * forking: child daemonizes, use PIDFILE= option
-    * oneshot: start main process which may stop shortly after but stay active in case RemainAfterExit=True
-ExecStart=
-    * 1 command except for oneshot type
-    * prefix by "-" to avoid break on bad exit code
-ExecStartPre=, ExecStartPost=
-    * multiple commmand lines, specify multiple times for multiple commands
-ExecStop
-    * Commands to stop service, workig only after successful start
-ExecStopPost=
-    * Cleanup Commands,
-ExecReload=
-    * Commands to execute to trigger a configuration reload in the service. Evaluates $MAINPID
-    * Command(s) shall wait until reload is finished
-```
+
+`Type`:
+* simple: ExecStart process is main process, running in foreground, not exiting (see oneshot)
+* forking: child daemonizes, use PIDFILE= option
+* oneshot: start main process which may stop shortly after but stay active in case RemainAfterExit=True
+`ExecStart`:
+* 1 command except for oneshot type
+* prefix by "-" to avoid break on bad exit code
+`ExecStartPre=, ExecStartPost`:
+* multiple commmand lines, specify multiple times for multiple commands
+`ExecStop
+* Commands to stop service, workig only after successful start
+`ExecStopPost`:
+* Cleanup Commands,
+`ExecReload`:
+* Commands to execute to trigger a configuration reload in the service. Evaluates $MAINPID
+* Command(s) shall wait until reload is finished
 
 ## SWAP
 
@@ -45,6 +44,22 @@ Linux kernel swappiness parameter values, see [ZFS Article](https://pve.proxmox.
 |`vm.swappiness = 10` | This value is sometimes recommended to improve performance when sufficient memory exists in a system.|
 |`vm.swappiness = 60` | The default value.|
 |`vm.swappiness = 100` | The kernel will swap aggressively.|
+
+Kernel memory overcommit: set 2
+
+Show which processes use swap
+
+    find /proc -maxdepth 2 -path "/proc/[0-9]*/status" -readable -exec \
+        awk -v FS=':' '{
+            process[$1]=$2
+            sub(/^[ \t]+/,"",process[$1])
+        } 
+        END {
+            if(process["VmSwap"] && process["VmSwap"] != "0 kB") 
+                printf "%10s %-30s %20s\n",process["Pid"],process["Name"],process["VmSwap"]
+        }' \
+    {} \;
+
 
 ## Packages
 Show  glibc dependecies
