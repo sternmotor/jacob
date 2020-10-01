@@ -1,3 +1,33 @@
+LDAP queries
+============
+
+Bash scripting
+
+* Shell script needs `/etc/openldap/ldap.conf`:
+
+
+        URI ldaps://ipa01.idm.example.com
+        BASE dc=idm,dc=example,dc=com
+        TLS_CACERT /etc/ipa/ca.crt
+
+* Credentials
+
+
+        BIND='uid=xtravbind,cn=sysaccounts,cn=etc,dc=idm,dc=example,dc=com'
+        PASS='xxx'
+
+* Example queries
+
+        BASE='cn=accounts,dc=idm,dc=example,dc=com'
+        ldapsearch -LLL -D "$BIND" -w "$PASS" -b "$BASE" "(&(objectClass=person)(|(memberof=cn=jira-admin*)(memberof=cn=jira-software*)(memberof=cn=jira-servicedesk*)))"
+        ldapsearch -LLL -D "$BIND" -w "$PASS" -b "$BASE" "(&(objectClass=person)(|(memberof=cn=jira-*)(memberofindirect=cn=jira-*)))"
+        ldapsearch -LLL -D "$BIND" -w "$PASS" -b "$BASE" "(&(objectClass=person)(uid=g.m*))"
+        ldapsearch -LLL -D "$BIND" -w "$PASS" -b "$BASE" "(&(objectClass=ipausergroup)(cn=jira-*))"
+
+        (&(objectclass=groupOfNames)(dn=cn=jira*))
+
+
+
 The RTC configuration is stored in the /etc/ldap/slapd.d/ directory. The slapd server's configuration can be modified by changing the configuration entries in the special RTC DIT cn=config with the tools in the ldap-utils package (ldapadd, ldapmodify, et cetera), but it is also possible to edit the files in the  /etc/ldap/slapd.d/ directory and restarting slapd.
 
 # lesen

@@ -6,6 +6,7 @@ Server, Devel
     Python3 python.org
     Powershell
     Docker
+    Homebrew
 
 Remote
     Seafile
@@ -21,6 +22,25 @@ Productivity
     MacDown für Einzeldateien
     Microsoft Office: Excel, Word, PPT
     Microsoft Remote Desktop
+
+
+## Homebrew
+
+
+Installation
+
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)
+    brew install wget 
+    
+    
+ZSH
+---
+
+Z Shell and oh-my-zsh
+
+    brew install zsh zsh-completions
+    sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+
 
 ## Teamviewer
 
