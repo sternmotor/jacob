@@ -30,6 +30,10 @@ In guest, btrfs:
     btrfs filesystem resize max /srv
     btrfs filesystem resize +10g /mountpoint
 
+In guest, xfs:
+
+    xfs_growfs /srv
+
 Security
 -------
 
