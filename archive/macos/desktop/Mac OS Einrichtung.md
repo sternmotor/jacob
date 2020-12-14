@@ -31,7 +31,23 @@ Installation
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)
     brew install wget 
-    
+
+# Backup und Datenablage
+
+Aus meiner Sicht fahrt Ihr macOssis am Besten wenn:
+* Alle Daten in der iCloud liegen 
+    * Einstellungen > iCloud > iCloud Drive 
+    * Einstellungen > iCloud> alles ausser "Mail"
+Ihr Backups per Time Machine auf einer externen Festplatte habt, welche nach großen Updates oder Änderungen gezogen werden und dann unterm Kopfkissen verschwinden
+
+In iCloud werden keine Systemeinstellungen gesichert. Die ändern sich aber auch nicht ständig, mit sporadischen Sicherungen sollten sich die Aufwände in Grenzen halten. 
+
+Zum Timemachine Backup: Mehrere Macs können auf eine Platte sichern. Dabei wird die gesamte Festplatte verschlüsselt, dieses Passwort muss dann beim Anstecken auf beiden Macs angegeben und evtl im Schlüsselbund gesichert werden. Backup Platte: Lacie Rugged USB-C 2TB (100€)
+
+2.) kannst Du bitte nochmal prüfen unter welcher AppleID Daniela arbeitet - ist das die gleiche wie in der Familienfreigabe?
+
+LG Gunnar
+ 
     
 ZSH
 ---

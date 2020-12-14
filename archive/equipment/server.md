@@ -17,6 +17,10 @@ get rebuild state
 
     megacli -PDList -aALL  | grep "Firmware state:"
 
+raid volume state
+
+    megacli -AdpAllInfo -aALL | grep -A 8 "Device Present"
+
 
 battery charge state
 
@@ -31,7 +35,7 @@ event log to file
 
     megacli -AdpEventLog -GetLatest 100 -f events.log -aALL 
 
-state of harddrive 0
+state of harddrives in raid
 
     megacli -PDList -a0
 

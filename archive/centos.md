@@ -34,22 +34,22 @@ Update to mainline kernel
 Packages
 --------
 If you haven’t already done so, install the Remi and EPEL repositories
-```
-wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm && rpm -Uvh epel-release-latest-6.noarch.rpm
-wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm && rpm -Uvh remi-release-6*.rpm
-```
+
+    wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm && rpm -Uvh epel-release-latest-6.noarch.rpm
+    wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm && rpm -Uvh remi-release-6*.rpm
 
 Fix bad mirror (example: `centos-gluster38`)
 
-```
-yum install -y yum-utils --disablerepo=centos-gluster38
-yum-config-manager --save --setopt=centos-gluster38.skip_if_unavailable=true
-```
+    yum install -y yum-utils --disablerepo=centos-gluster38
+    yum-config-manager --save --setopt=centos-gluster38.skip_if_unavailable=true
 
 Searching for a package with binary name
-```
-yum whatprovides */ls
-```
+
+    yum whatprovides */ls
+
+Installing epel package which cannot be found by `yum searcj <pkg>`
+
+    yum --enablerepo=epel install ncdu
 
 Generate rpm file from source
 -----------------------------

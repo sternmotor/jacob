@@ -25,6 +25,17 @@ sudo smartctl -l selftest /dev/sda
 * [Thomas Krenn](https://www.thomas-krenn.com/de/wiki/SMART_Tests_mit_smartctl) - short and useful
 
 
+Mounts
+------
+
+Display mounted file systems
+
+    mount | column -t
+
+Display only certain filesystems
+
+     mount -t btrfs,ext4 | column -t
+
 
 ## Partitionen
 

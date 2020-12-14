@@ -1,5 +1,16 @@
 # Secure SMS sending
 
+ClickSend
+---------
+
+* python lib for api access
+* sender ID field showing up in SMS
+* good gui
+
+
+CM Telekom
+----------
+
 Send SMS over SSL-secured Rest API for Password transfer (where email would be a security hole)
 * provider: [CM telekom](https://www.cm.com/products/text/sms/) 
 * [API documentation](https://docs.cmtelecom.com/bulk-sms) - sending is done via simple Json POST requests

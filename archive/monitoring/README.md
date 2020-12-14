@@ -1,4 +1,5 @@
 # Monitoring Automatisation
+
 ## Self healing
 * General cycle:
     * Automatisation configures Monitoring
@@ -46,10 +47,35 @@
 
 
 ### Service Monitoring
-* master/ slave connection
+* master/ slave / cluster connection
+* ha elected master, quorum state
 * state: running and responding to network request
 * backup/dump outdated
 * expired certificates
 * load per service
 * network traffic per service
 * info: Software version, manufacturer
+
+
+
+Monitoring Guidelines
+---------------------
+
+Don't alert if it doesn't die from it: If nobody needs to interact with the system as an "incident response" then this does not need to be alerted. May still be relevant for report
+ing but this does not qulaify for a notification, in general.
+
+Notification subject: make it easy readable, sortable and generally user-friendly - not debugging-friendly. Use OK / CRIT instead of PROBLEM / RECOVERY / FLAPPINGSTART / FLAPPINGSTOP
+
+Split notification levels for 24/7 and office hour operation (only alert end-end errors 24/7, no component errors).
+
+Monitoring sysztem requirements
+------------------------
+Proxies for sites, central server for management
+
+Trend prediction - how long does this free disk space last and hysteresis - different limits for Problem and Recovery
+
+Long time storage for reporting data and alerting data
+
+Dashboard: 
+* Groups and criticality/ number of failures in one spot
+* Whats wrong with mails: error-prone - how to find the recovery mail for every problem?

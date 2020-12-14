@@ -32,6 +32,32 @@ Expand last partition to maximum available space
 GPT Partitionen
 ----------------
 
+Create GPT partition scheme
+
+* reset partition layout and mbr
+
+    ROOT_DRIVE=/dev/sdb
+    dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 status=none \
+    && seek_block=$(($(blockdev --getsz $ROOT_DRIVE) - 2)) \
+    && dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 seek=$seek_block status=none
+
+* write new partitions
+
+    parted    --align optimal --script $ROOT_DRIVE -- mklabel gpt \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart ${HOST}_BIOS fat32 2048s 4095s \
+    && parted                 --script $ROOT_DRIVE -- set 1 bios_grub on \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart BOOT ext4 4095s 512MiB \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart RESCUE ext4 512Mib 10GiB \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart LIVE btrfs 10GiB 100% \
+    && parted $ROOT_DRIVE print
+
+* format drives (boot, rescue)
+
+    sleep 1 \
+    && mkfs.ext4 -q -G 4096 -qF -m 0 -L "LIVE_BOOT" ${ROOT_DRIVE}2 \
+    && mkfs.ext4 -q -G 4096 -qF -m 5 -L "RESCUE" ${ROOT_DRIVE}3
+
+
 EXT Filesystem
 --------------
 
@@ -51,6 +77,10 @@ Get compressed ("used") and compressed + reserved ("total") space
 
     sudo btrfs filesystem df /srv
 
+Re-compress MySQL partitions (inndob with DirectIO circumventing compression):
+
+    sudo btrfs defragment  -rcf <path>
+    sudo btrfs filesystem df <path>
 
 
 Permissions
