@@ -1,0 +1,24 @@
+# Network
+Port 30000
+Compression delayed
+X11Forwarding no
+TCPKeepAlive yes
+ClientAliveInterval 60
+ClientAliveCountMax 5
+UseDNS no
+
+# Authentification
+LoginGraceTime 60
+MaxAuthTries 3
+ChallengeResponseAuthentication no
+DenyUsers All
+AllowUsers core root
+PermitRootLogin without-password
+PasswordAuthentication no
+
+# System
+Protocol 2
+UsePAM yes
+StrictModes yes
+AcceptEnv TERM COLORFGBG
+Ciphers chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com

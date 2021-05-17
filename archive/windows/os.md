@@ -7,7 +7,7 @@ Repair
 Speedup slow windows
 
 * temporarily disable antivir software, then:
-	1. remove all unnneeded software, reboot
+	1. remove all unneeded software, reboot
 	2. run ccleanup 
 	3. check for broken windows files:
 

@@ -1,13 +1,54 @@
-# Linux OS
+Linux OS
+========
 
-## Hardening
-Security analysis: see [Lsat Tool](http://usat.sourceforge.net)
 
-## Bootstrap, footprint
+View kernel messages with readable timestamp
 
-see [ReduceDebian](https://wiki.debian.org/ReduceDebian)
+    dmesg -HT
 
-## SystemD and Units
+
+SystemD
+-------
+
+### System control
+
+
+Shutdown without acpi hang up at end of shutdown process (`halt` problem)
+
+    systemctl poweroff
+
+
+### Logging
+
+List all services with state
+
+    systemctl
+
+View single service log, tail -f mode
+
+    journalctl -fu <service>
+
+
+Enable persistent journald log (to compare boot process messages)
+
+* prepare
+
+    mkdir -p /var/log/journald
+    systemd-tmpfiles --create --prefix /var/log/journald
+
+* edit `/etc/systemd/journald.conf`:
+
+    [Journal]
+    Storage=Persistent
+    RateLimitBurst=0
+    RateLimitIntervalSec=0
+
+* enable changes
+
+    systemctl restart journald
+
+
+### Unit design
 
 Links:
 * [Systemd Introduction]( https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-units)
@@ -15,25 +56,110 @@ Links:
 * [Systemd python inotify](https://pypi.python.org/pypi/sdnotify) and [SD Notify](https://www.freedesktop.org/software/systemd/man/sd_notify.html#)
 
 Unit file
+`Type`
 
-`Type`:
-* simple: ExecStart process is main process, running in foreground, not exiting (see oneshot)
-* forking: child daemonizes, use PIDFILE= option
-* oneshot: start main process which may stop shortly after but stay active in case RemainAfterExit=True
-`ExecStart`:
+* `simple`: ExecStart process is main process, running in foreground, not exiting
+* `forking`: child daemonizes, use PIDFILE= option
+* `oneshot`: start main process which may stop shortly after but stay active in case `RemainAfterExit=True`
+
+
+`ExecStart`
+
 * 1 command except for oneshot type
-* prefix by "-" to avoid break on bad exit code
-`ExecStartPre=, ExecStartPost`:
+* prefix by `-` to avoid break on bad exit code
+
+`ExecStartPre=, ExecStartPost`
+
 * multiple commmand lines, specify multiple times for multiple commands
-`ExecStop
+
+`ExecStop`
+
 * Commands to stop service, workig only after successful start
-`ExecStopPost`:
-* Cleanup Commands,
-`ExecReload`:
-* Commands to execute to trigger a configuration reload in the service. Evaluates $MAINPID
+
+`ExecStopPost`
+
+* Cleanup Commands
+
+`ExecReload`
+
+* Commands to execute to trigger a configuration reload in the service. Evaluates `$MAINPID`
 * Command(s) shall wait until reload is finished
 
-## SWAP
+
+Load, CPU usage
+---------------
+
+Calculate overall CPU usage per cpu
+
+    awk '/cpu /{print "Avg CPU usage: "($2+$4)*100/($2+$4+$5)}' /proc/stat
+
+
+
+Sensible multipliers for monitoring load limits
+
+| | 1min | 5min | 15min |
+|----|----|----|----|
+|warning |4|3|2|
+|critical|4.5|3.5|3|
+
+
+Kernel parameters
+-----------------
+load and display kernel variables defined permanently in system config
+
+	sysctl -p
+
+set kernel variables temporarily, check for errors
+
+	sysctl -w variable=value
+
+set kernel variables permanently, set instantly
+
+	echo "variable = value" >> /etc/sysctl.conf
+	sysctl -p
+
+
+
+Memory and Swap
+---------------
+
+Retrieve total memory (scripting) in MB (example below)
+
+	awk '/MemTotal:/{print $2/1024}' /proc/meminfo
+
+
+### Troubleshooting memory issues
+
+Trouble:
+
+* sysctl: `setting key "kernel.msgmni": Invalid argument`
+* httpd: `No space left on device: AH00023: Couldn't create the ssl-cache mutex`
+
+Shot:
+
+* see [IBM documentation](https://www.ibm.com/support/knowledgecenter/SSEPGG_11.5.0/com.ibm.db2.luw.qb.server.doc/doc/t0008238.html)
+* rules for sysctl settings
+	* max shared mem segments: `kernel.shmmni` to 256 times the size of RAM (in GB)
+	* max message queues: `kernel.msgmni` to 1024 times the size of RAM (in GB)
+	* semaphore limits: `kernel.sem = 250 256000 32 1024` (max semaphores per array, max semaphores system wide, max ops per semop call, max number of arrays)
+		
+* do it 
+
+        awk '/MemTotal:/{print "kernel.shmmni = "int($2/1024/1024*256)}' \
+        /proc/meminfo >> /etc/sysctl.conf
+        awk '/MemTotal:/{print "kernel.msgmni = "int($2/1024/1024*1024)}' \
+        /proc/meminfo >> /etc/sysctl.conf
+        echo 'kernel.sem = 250 256000 32 1024' >> /etc/sysctl.conf
+        sysctl -p
+
+* validate (e.g. after reboot)
+
+        ipcs -l
+
+* note: for Redhat systems > 32GB: Centos 7.8 limit for kernel.msgmni, kernel.semmni, and kernel.shmmni is 32768 - fix by adding `ipcmni_extend` option to `GRUB_CMDLINE_LINUX`.
+
+
+### Swap setup
 
 Linux kernel swappiness parameter values, see [ZFS Article](https://pve.proxmox.com/wiki/ZFS_on_Linux)
 
@@ -60,93 +186,54 @@ Show which processes use swap
         }' \
     {} \;
 
+Hardening
+---------
 
-## Packages
-Show  glibc dependecies
+Security analysis: see [Lsat Tool](http://usat.sourceforge.net)
 
-```
-lsof | grep libc | awk '{print $1}' | sort | uniq
-```
-Show  glibc version
 
-```
-ldd --version
-```
+Packages, Software, Distributions
+---------------------------------
 
-### Centos package management (yum)
+Show distribution info
+
+    lsb_release --all
+
+
+### Redhat/Centos package management (yum)
 
 Find package containing command
 
-```
-yum provides */archivemount
-```
+    yum provides */archivemount
 
 Clear cache
-```
-yum clean packages
-yum clean all # reset completely
-```
+
+    yum clean all
 
 Remove old kernel packages
-```
-yum install yum-utils
-package-cleanup --oldkernels --count=1
-```
 
-### Ubuntu package management (apt)
-
-Show Ubuntu Distributions ID
-```
-lsb_release --short --release
-```
+    yum install yum-utils
+    package-cleanup --oldkernels --count=1
 
 
-Upgrade Ubuntu LTS versions:
-```
-mount -o remount,exec  /tmp
-apt-get update
-apt-get dist-upgrade -y
-apt-get install --yes update-manager-core ppa-purge
-apt-get --purge --yes autoremove
-apt-get clean all
-# remove package configurations left over from packages that have been removed (but not purged).
-sudo apt-get purge $(dpkg -l | awk '/^rc/ { print $2 }')
-do-release-upgrade
-# y
-# Enter
-# Enter
-# y  # takes several hours
-# no, do not restart services
-# Reboot: no
-apt-get purge -y update-manager-core ppa-purge
-apt-get --yes --purge autoremove
-apt-get clean all
-reboot
-```
+### System libs
 
-### Replace distribution
-This is not a distribution upgrade but a fresh install of operating system parallel to running OS. It may be necessary to do a manual reset of the computer at the end of this procedure (in case reboot does not work - this depends on OS).
-First, the  new operating system is bootstrapped to a temporary dir `/srv/os_new`. This is then copied to a working dir `/srv/os_work` (where os commands are still available). From this working dir, the old operating system is replaced by the new copy.
+Show  glibc dependencies
 
-Filesystem config(`/etc/fstab`) and network config(`/etc/network/interfaces`) are simply copied to new system but may need modifications, depending on os versions.
+    lsof | grep libc | awk '{print $1}' | sort | uniq
 
-After rebooting, the old file system is still available under `/srv/os_old`
+Show  glibc version
 
-Example: Upgrade Ubuntu 14.04 > 18.04:
+    ldd --version
 
-```
-for service in rsyslog, mysql, zabbix-proxy1, zabbix-agent1, zabbix-autossh1; do
-        /etc/init.d/$service stop
-done
-```
 
-## Resetting linux server identity
+Resetting linux server identity
+-------------------------------
 When cloning an os, it may be nececcary to convert the copied system to a new identity.
 
 Adapt to new network card MACs
-```
-rm /etc/udev/rules.d/70-persistent-net.rules -vf
-```
+
+    rm /etc/udev/rules.d/70-persistent-net.rules -vf
 
 Manually update network configuration
 * `/etc/hosts`
@@ -155,79 +242,65 @@ Manually update network configuration
 * `/etc/ssh/sshd_config`
 
 
+Re-generate moduli for ssh (optinally)
 
-Optional: re-generate moduli for ssh
-```
-rm /etc/ssh/moduli /etc/ssh/ssh_host*
-tmpfile=$(tempfile)
-ssh-keygen -G $tmpfile -b 2048  # 1024 bits was shipped
-sudo ssh-keygen -T /etc/ssh/moduli -f $tmpfile
-rm $tmpfile
-```
+    rm /etc/ssh/moduli /etc/ssh/ssh_host*
+    tmpfile=$(tempfile)
+    ssh-keygen -G $tmpfile -b 2048  # 1024 bits was shipped
+    sudo ssh-keygen -T /etc/ssh/moduli -f $tmpfile
 
-replace SSH host keys and those of user "root"
-```
-host=$(dnsdomainname --fqdn)
-date=$(date -Iseconds)}    
-mv -v /etc/ssh/ssh_host_rsa_key{,.bak_$date}
-mv -v /etc/ssh/ssh_host_ed25519_key{,.bak_$date}
-mv -v /etc/ssh/ssh_host_dsa_key{,.bak_$date}
-mv -v /etc/ssh/ssh_host_ecdsa_key{,.bak_$date}
-sudo ssh-keygen -t rsa     -b 4096 -C $host -N '' -f /etc/ssh/ssh_host_rsa_key
-sudo ssh-keygen -t ed25519 -C $host -N '' -f /etc/ssh/ssh_host_ed25519_key
-sudo ssh-keygen -t dsa     -C $host -N '' -f /etc/ssh/ssh_host_dsa_key
-sudo ssh-keygen -t ecdsa   -C $host -N '' -f /etc/ssh/ssh_host_ecdsa_key
+Replace SSH host keys and those of user "root"
 
-for user in root; do
-    echo "Re-creating key for \"$user\""
-    sudo su --login $user --command "{
+    host=$(dnsdomainname --fqdn)
+    date=$(date -Iseconds)}    
+    mv -v /etc/ssh/ssh_host_rsa_key{,.bak_$date}
+    mv -v /etc/ssh/ssh_host_ed25519_key{,.bak_$date}
+    mv -v /etc/ssh/ssh_host_dsa_key{,.bak_$date}
+    mv -v /etc/ssh/ssh_host_ecdsa_key{,.bak_$date}
+    sudo ssh-keygen -t rsa     -b 4096 -C $host -N '' -f /etc/ssh/ssh_host_rsa_key
+    sudo ssh-keygen -t ed25519 -C $host -N '' -f /etc/ssh/ssh_host_ed25519_key
+    sudo ssh-keygen -t dsa     -C $host -N '' -f /etc/ssh/ssh_host_dsa_key
+    sudo ssh-keygen -t ecdsa   -C $host -N '' -f /etc/ssh/ssh_host_ecdsa_key
+
+    sudo su - --command "{
         mv -v ~/.ssh/id_rsa{,.bak_$date
         mv -v ~/.ssh/id_rsa.pub{,.bak_$date
-        ssh-keygen -C $user@$host -b 4096 -N '' -f ~/.ssh/id_rsa
-    }
-    "
-done
-```
+        ssh-keygen -C root@$(hostname -f) -b 4096 -t ed25519 -N '' -f ~/.ssh/id_ed25519
+    }"
 
 Create new harddrive UUIDs 
-```
-apt-get install uuid-runtime
-tune2fs /dev/sda -U $(uuidgen)
-tune2fs /dev/sdb -U $(uuidgen)
-```
+    apt-get install uuid-runtime
+    tune2fs /dev/sda -U $(uuidgen)
+    tune2fs /dev/sdb -U $(uuidgen)
 
-Festplatten UUIDs in fstab eintragen (manuell!)
 
 Insert new harddrive UUIDs in `/etc/fstab` for *manual editing*
-```
-blkid /dev/sd* >> /etc/fstab
-vim /etc/fstab
-```
+
+    blkid /dev/sd* >> /etc/fstab
+    vim /etc/fstab
 
 Recreate Grub config and initrd:
 
-```
-update-initramfs -u -k all
-update-grub
-```
+    update-initramfs -u -k all
+    update-grub
 
-## Load
-
-Caclulate overall CPU usage
-```
-grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {print usage "%"}'
-```
-
-
-multipliers for monitoring load limits (nagios, warning and critical):
-
-| | 1min | 5min | 15min |
-|----|----|----|----|
-|warning |4|3|2|
-|critical|4.5|3.5|3|
     
+Bootstrap, LiveUSB
+------------------
 
 
-# LiveCD, Live USB
+Bootstrapping Debian: see [ReduceDebian](https://wiki.debian.org/ReduceDebian)
 
-Best by far: https://willhaley.com/blog/custom-debian-live-environment/
+LiveCD, Live USB, best by far: https://willhaley.com/blog/custom-debian-live-environment/
+
+Troubleshooting
+---------------
+
+
+
+kernel:NMI watchdog: BUG: soft lockup - CPU#1 stuck for 44s! 
+    * read [this blog entry](https://blog.seibert-media.net/blog/2017/10/05/it-tagebuch-linux-was-sind-cpu-lockups/) - in short:
+	* soft lockup: kernel task does not release cpu time to other processes 
+	* reasons: high load or very high levels of cpu time overcommit
+    * this is clearly a kernel process hangup (no process in user space can cause a soft lockup)
+    * try updating kernel, play with cpu overcommit on virtualized systems and watch load

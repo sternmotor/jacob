@@ -19,10 +19,26 @@ zless, zcat ... show zipped logs
 OS cleanup
 ----------
 
+See "Kernel" and "Packages" sections below
 
-    yum clean all
-    journalctl --vacuum-time=7d
-    abrt-cli rm /var/spool/abrt/*
+
+    sudo journalctl --vacuum-time=7d
+    sudo yum clean all
+    sudo package-cleanup -y --oldkernels --count=2
+    sudo abrt-cli rm /var/spool/abrt/*
+
+
+Kernel
+------
+
+Restrict number of installed kernels to 2:
+
+    if ! grep -q "installonly_limit=2" /etc/yum.conf; then
+        echo "installonly_limit=2" >> /etc/yum.conf
+    fi
+    package-cleanup -y --oldkernels --count=2
+
+
 
 Update to mainline kernel
 
@@ -33,10 +49,18 @@ Update to mainline kernel
 
 Packages
 --------
-If you haven’t already done so, install the Remi and EPEL repositories
 
-    wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm && rpm -Uvh epel-release-latest-6.noarch.rpm
-    wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm && rpm -Uvh remi-release-6*.rpm
+Cleanup - recovers from several troubles
+
+    yum clean all
+    package-cleanup --cleandupes
+    rpm --rebuilddb
+
+
+Install the Remi and EPEL repositories
+
+        wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm && rpm -Uvh epel-release-latest-6.noarch.rpm
+        wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm && rpm -Uvh remi-release-6*.rpm
 
 Fix bad mirror (example: `centos-gluster38`)
 
@@ -47,9 +71,11 @@ Searching for a package with binary name
 
     yum whatprovides */ls
 
-Installing epel package which cannot be found by `yum searcj <pkg>`
+Installing epel package which cannot be found by `yum search <pkg>`
 
     yum --enablerepo=epel install ncdu
+
+
 
 Generate rpm file from source
 -----------------------------
@@ -82,13 +108,11 @@ Server vmhost bridge for vm
 
 * edit `/etc/sysconfig/network-scripts/ifcfg-br1217`
 
-```
-DEVICE=br1217
-ONBOOT=yes
-TYPE=Bridge
-BOOTPROTO=static
-NAME=br1217
-```
+        DEVICE=br1217
+        ONBOOT=yes
+        TYPE=Bridge
+        BOOTPROTO=static
+        NAME=br1217
 
 * edit `/etc/sysconfig/network-scripts/ifcfg-vlan1217`
 ```

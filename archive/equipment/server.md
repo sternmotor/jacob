@@ -6,18 +6,22 @@ Server hardware inspection
 MegaCLI Raid
 ------------
 
+Check https://wiki.magenbrot.net/linux/hardware/dell/megacli_cheatsheet
+
 
 
 
 rebuild progress
 
-    watch -d -n 30 'megacli -FwTermLog -Dsply -aALL | tail -n 3'
+    watch -d -n 30 megacli  -PDList -aALL | grep state
+    watch -d -n 30 megacli -FwTermLog -Dsply -aALL | tail -n 3
+    watch -d -n 30 /opt/MegaRAID/MegaCli/MegaCli64 -PDRbld -ShowProg -PhysDrv ["252":"4"] -aAll
 
-get rebuild state
+get firmware state
 
     megacli -PDList -aALL  | grep "Firmware state:"
 
-raid volume state
+raid volume stat   watch -d -n 30 'megacli -FwTermLog -Dsply -aALL | tail -n 3'e
 
     megacli -AdpAllInfo -aALL | grep -A 8 "Device Present"
 

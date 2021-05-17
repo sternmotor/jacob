@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+
+PARENT='/srv'
+echo "not tested -does this run on subvolume or volume?"
+exit 0
+
+sudo btrfs filesystem balance "$PARENT"
+sudo btrfs filesystem defrag -c "$PARENT"
+

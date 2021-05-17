@@ -1,0 +1,33 @@
+syntax on 
+set hlsearch
+set mouse=	
+set encoding=utf-8
+set noautoread 
+set noautowrite
+set modeline
+set modelines=5
+if !isdirectory(&viewdir)
+    call mkdir(&viewdir, "p")
+endif
+set backup
+if has('persistent_undo')
+    set undofile   
+    set undoreload=10000    
+endif
+set undolevels=500 
+set history=500   
+set nosmartindent
+set nocindent
+set autoindent  
+set expandtab    
+set shiftwidth=4 
+set tabstop=4    
+set smartcase
+set virtualedit=block 
+set statusline=[%n]\ %F\ %M%R%H\ \ %y\ \ %p%%%=Line:%l/%L\ \ Column:%c
+set backupdir=~/.vim/
+set directory=~/.vim/cache
+set   viewdir=~/.vim/cache
+if exists("&undodir")
+    set   undodir=~/.vim/cache
+endif

@@ -1,6 +1,19 @@
-# AWK programming
+AWK programming
+===============
 
-* See  
+
+
+One-liners
+----------
+
+filter last and second last string between separator, here: tld from fqdn
+
+    echo $fqdn | awk 'BEGIN{FS=OFS="."}{print $(NF-1),$NF}'
+
+
+
+Programming
+-----------
 
 
 

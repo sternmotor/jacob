@@ -1,0 +1,53 @@
+#!/bin/sh -eu
+LANG=C
+
+usage() {
+    echo "Usage: $(basename "$0") HOST1 [HOST] [HOSTn]"
+    echo
+    echo "Shows collected facts for given host(s)"
+}
+
+
+# contants
+REDIS_CONTAINER=ansible-redis
+SCRIPT_PATH="$(readlink -e "$0")"
+
+
+# check input, collect warning_sbm and critical_sbm
+while [ $# -gt 0 ]; do
+
+    case "$1" in
+    -h|--help)
+        usage
+        exit 0
+    ;;
+    *)
+        HOSTS="${HOSTS:-} $1"
+        shift 1
+    ;;
+    esac
+done
+
+
+# set up tempdir and auto-removal
+TEMP_DIR=$(mktemp -d --suffix="$(basename "$0")")
+trap "{ rm -rf $TEMP_DIR; }" EXIT
+
+
+
+
+# host patterns given - do it
+if [ ! -z "$HOSTS" ]; then
+
+    docker exec $REDIS_CONTAINER redis-cli mget $HOSTS
+
+# missing host patterns - exit
+else
+
+    usage
+    exit 1
+
+fi
+
+# GMA 2021
+# vim: ts=4:sw=4:ft=sh:et

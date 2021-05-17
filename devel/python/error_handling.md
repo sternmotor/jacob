@@ -13,7 +13,7 @@ print exception message (no stack trace)
         err_text = getattr(err, 'message', repr(err))
         log.error(err_text)
 
-log exception stack trace
+log exception with stack trace
 
 
     try:

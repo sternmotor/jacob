@@ -1,0 +1,73 @@
+{
+    "ignition": {
+        "config": {},
+        "timeouts": {},
+        "version": "2.3.0"
+    },
+    "networkd": {},
+    "passwd": {
+        "users": [{
+            "name": "core",
+            "sshAuthorizedKeys": [
+                "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCWYeIv59k51zweaf/MrBomaBD42e4c283MhX+LtwEc+rrZiu1iEyACKoXicNYpbeeREw8guXsXBxmI6ISQT54zGIwJ8TcctPpvBXRyYVkQdF/qetyHQl/U48TyZQ406gbpA7zbdXhMNz3LYr76Wyw3H9nN0g0RZVMMc23SDgYXdofzrojQhUMqHHnPvic/0yoepyC8q6PuEdvdW5sL0oWjhor62kOJ64Zf8PvFJFUT14iDDpmSuFW5igM/WW//HU2wH4PqBQYPlmz7QCvskjTnV3hqeuvSnaL2vtb7o8Sbl8LQSVJHPkBpnCDqPOD1KlkIuC153yOGmDTAKZ6t7xaXxOrcfbE+9KtwoEn5sx6fMS1mi0E3CQTeADSVinmVpJLKGQBu0smddGkVuabCTC597tiC3+iDz0NUr/HWJtjs4O+3JRwO55gTqF/TlqNp47jcydBWESVFhyUTmD8LDrQym6TYnaXeQGuWxif3Ijdub9633nriZpPYrDWSpdwXy1+DUPo+wY8E8DD2dbN/KS7dRT8RCB6lqTAJW1Akbbf/WcWf0DWpcu/zADLNwb01wAWCP85FzxXFseXD6NEZnVuJMR1Oz4wE8eBjk79EvtdLOZHOdz5oYkUJERfphe4eK3Xzde8wZe4FTy2qOiSGTYsgHf6jbA25jAGP5Fevsx8Khw== gunnar@macbook",
+                "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCeWnz1i13zfR+xYGU27bOMmo+Hr5lOdJGVz75B9WHdWsZ9zsSc/Xvpaz2+FMZW8Mq1nOM9zl4uOFkl43erTVR7arBFfyF280oaulxo8hynBdzWfG1zw3OU6L0HnMk5FcgiKMSUpkfDurRs6FjD6rtwDNi+C4pXnwbsGyW8kr55tyqf4qxbhbGAD/jzbt5OXl35BqtwpdpFKenLLOtQgsotgYOIu9Ephf+jUI9zL7ZjWZvYQKBlrIcx5o4Di1N8HPBw1MQhEqZr+TxJdsG/rZFN/gMVrV/4Svhf6b0sGEcE/wVWPTsYbL7uO33BZNbB7hIbFOOoml3j3ALmtzZWxHORpVulbaivxbBLUfhhZxdUlqgBL0oEmSVLESwVvxfykCDd+amjz7w5I/L79eB8IKwO2qVWO1pD9eAqOLXeZvhee4o7sCQ4otm3p+DXsJ0AZiACSp817etSkdrTB6g3q8crRQ9wt/0AKG2XtRVSk5Y0adkL++n7araXx9e/A6aA3taj/Hh8maYCSEHwjhUpcsYKOks4hBm2WJpwbzmiXy43Y8f7yFNIJAA3GtVz1bpSEi6+vDxrL7VADd3/jJc0cSAQ1YwlgN1YcqQUiRXlmC0xGjozt82XrYznZD7Y3MQLbyxf7XMPLdI56MSlJF0T4K2Rdv7nADSo5e6sb/JNaWGBRQ== g.mann@quince",
+                "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCrYStE0kH2pN/Ks8it9yW+YwDlOVaXEJ0c9xF9QxE9VVimbDRgoPuDuYmREPGuVLRAwnT4L8jzn3XcJYB0l1u6gt/Sl76BDCmu4IVMM+OPrbAMAYp/zrLPNPxoCJqaUtEOkP8hqG4JRHHaJZ71EHW55rdt4m/uoOPgWPkYkO4p+HHZwfySyhDN8SHAZFwQ8H19ktvW5aYgiO8U0k1skGoL3dh5nvpkR4rHE02ozzm6GRVB3XTK9JMbQZxeuU7VEFwVh64s0742AiWMK3H8WfidmRiuYj/x07phz08R6TAv83KMxP2w4Pb0mav6s1LELO1GLZsKeFdhMmHGzc4MsC/h root@sternmotor2"
+            ]
+        }]
+    },
+    "storage": {
+        "files": [
+            {
+                "filesystem": "root",
+                "path": "/etc/hostname",
+                "mode": 420,
+                "contents": {
+                    "source": "data:,elvis"
+                }
+            }
+        ],
+        "links": [{
+            "filesystem": "root",
+            "path": "/etc/localtime",
+            "target": "/usr/share/zoneinfo/Europe/Berlin",
+            "overwrite": true
+        }],
+        "disks": [{
+            "device": "/dev/sda",
+            "partitions": [
+                {
+                    "label": "ROOT",
+                    "number": 9,
+                    "sizeMiB": 49152,
+                    "startMiB": 0,
+                    "typeGuid": "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709",
+                    "wipePartitionEntry": true
+                },
+                {
+                    "label": "DATA",
+                    "number": 10,
+                    "sizeMiB": 0,
+                    "startMiB": 0,
+                    "typeGuid": "3B8F8425-20E0-4F3B-907F-1A25A76F98E8"
+                }
+            ]
+        }],
+        "filesystems": [
+            {
+                "mount": {
+                    "label": "DATA",
+                    "device": "/dev/disk/by-partlabel/DATA",
+                    "format": "btrfs",
+                    "wipeFilesystem": true
+                }
+            }
+        ]
+    },
+    "systemd": {
+        "units": [{
+            "contents": "[Mount]\nWhat=/dev/disk/by-label/DATA\nWhere=/srv\nType=btrfs\nOptions=defaults,noatime,compress=zstd\n[Install]\nWantedBy=local-fs.target",
+            "enable": true,
+            "name": "srv.mount"
+        }]
+    }
+}

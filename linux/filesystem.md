@@ -1,6 +1,50 @@
 Linux file system manipulation
 ==============================
 
+Copy files
+----------
+
+rsync directory structure, only:
+
+    rsync -av --include='*/' --exclude='*' /path/to/src /path/to/dest/
+
+
+
+Copy devices
+------------
+
+`dd` progress: specifying a bs= parameter that aligns with the disks buffer memory will get the most performance from the disk.
+
+    dd status=progress 
+
+
+
+Pipe transfer of disk devices
+-----------------------------
+
+See "LVM" section for another example. `dd` usage is not handled here, replaced by `nc`.
+
+
+### nc
+
+Required packages on both servers:  `zstd`, `pv`, `netcat`
+
+Simple: use slower ssh connection from source to host 
+
+    pv /dev/<device> | zstd -T0 | ssh target.example.com "zstd -T0 -dcf > /dev/<device>"
+
+
+Fast: using `nc` is faster than ssh but needs a listener to be run on TARGET site.
+Make sure target and source device have same size. 
+
+* on destination host (show compressed size):
+
+        nc -l 7000| pv | zstd -T0 -dcf > /dev/<device>  
+
+* on source host (show raw data size)
+
+        pv /dev/<device> | zstd -T0 | nc target.example.com 7000
+
 
 LVM
 ---
@@ -9,6 +53,32 @@ Create and remove snapshot
 
     lvcreate -L 20G -s -n diskname-snap /dev/vg0/diskname
     lvremove /dev/mapper/vg0-diskname-snap
+
+Pipe transfer of multiple disks with snapshot, lv creation and remote operation
+from source on destination host, requires "pv", "zstd" and "netcat" an
+exchanged ssh keys:
+
+    yum install -y zstd pv nc
+
+Run
+
+    TARGET=remote_server.example.com
+    LVS="server1.example.com_root server1.example.com_srv"
+    SNAP_SIZE=10G
+    VG=vg0
+
+    for lv_name in $LVS; do
+        lv_path="/dev/$VG/$lv_name"
+        lv_size=$(lvdisplay --units k $lv_path | awk '/LV Size/{print $3}')
+
+        ssh -n $TARGET "lvcreate -Wn --size ${lv_size}kiB --name $lv_name $VG"
+        lvcreate --snapshot --name ${lv_name}_transfersnap --size $SNAP_SIZE $lv_path
+        ssh -n $TARGET "nc -l 7000| pv | zstd -T0 -dcf > $lv_path" &
+        time pv $lv_path | zstd -T0 --fast | nc $TARGET 7000
+        fg 1
+        lvremove --yes ${lv_path}_transfersnap
+    done
+
 
 MBR Partitionen
 -----------------
@@ -82,11 +152,18 @@ Re-compress MySQL partitions (inndob with DirectIO circumventing compression):
     sudo btrfs defragment  -rcf <path>
     sudo btrfs filesystem df <path>
 
+Create compressed file system 
+
+    mkfs.btrfs -L SRV /dev/vol1/srv
+    echo '/dev/mapper/bg0-srv /srv btrfs defaults,noatime,acl,nodev,nosuid,compress=zstd 0 0' >> /etc/fstab
+    mount /srv
+
 
 Permissions
 -----------
 
-Quick way to set (override) ACLs and linux permissions, enabling inheritance via default acls
+Quick way to set (override) ACLs and linux permissions, enabling inheritance
+via default acls
 
                                                                         
     TARGET=/etc/logrotate.d /etc/filebeat/conf.d
@@ -99,9 +176,8 @@ Remove `executable` permissions from file (e.g. in webroot)
     find /srv/tokenizer -type f -exec chmod a-x {} \;
 
 
-Copy files
-----------
+    
 
-rsync directory structure, only:
 
-    rsync -av --include='*/' --exclude='*' /path/to/src /path/to/dest/
+
+

@@ -1,6 +1,6 @@
 # Jacob
 
-Jacob is "Just another Admin Cook Book" - a collection of snippets and some useful rules
+This is "**J**ust **a**nother **A**dmin **C**ook **B**ook" - a collection of snippets and some useful rules
 for daily admin's work, centered on
 * network infrastructure and devices
 * servers: ubuntu linux and windows server
@@ -14,7 +14,7 @@ Most parts are not commited yet, this is a work under construction.
 # Content Overview
 
 * `automatisation`: ansible, puppet
-* `database` mysql mssql administration incl. backup
+* `database` postgres, mysql mssql administration incl. backup
 * `devel`: bash python powershell snippets and programming guide
     * `bash` directory like python
     * `styleguide.md`: general scripting guide
@@ -33,7 +33,7 @@ Most parts are not commited yet, this is a work under construction.
     * `powershell` directory like python
 * `email`: groupware, exchange, postfix, dovecot, ssl (link to web section), backup, contacts, calendar
 * `equipment`: user stuff: phone, fax, printer, dsl provider, desktop hardware (see network)
-* `linux`: very os-specific topics, small snippets (bash)
+* `linux`: os-specific topics, small snippets (bash)
     * `antix`, `debian`, `fluxbox`, `ssh`, `gentoo`: big special topics
     * `backup.md`
     * `files.md`
@@ -55,7 +55,7 @@ Most parts are not commited yet, this is a work under construction.
         * `time-date-units.md`
     * `shell, console, desktop`: Keyboard shortcuts, console configuration, user profile
     * `time-date-units.md`
-* `macos`: very os-specific topics
+* `macos`: os-specific topics
     * `shell, console`: Keyboard shortcuts, console configuration
     * `desktop`: user profile
     * `filesystem.md`: permissions in file system
@@ -68,7 +68,7 @@ Most parts are not commited yet, this is a work under construction.
 * `user`: rbac, user directories, active directory, identity management, kerberos, ldap, SSO
 * `virtualisation`: docker, hyperv, xen, proxmox
 * `web`: web servers, reverse proxy, ssl
-* `windows`: very windows-specific topics (powershell, screenshots)
+* `windows`: windows-specific topics (powershell, screenshots)
     * `backup.md`
     * `users.md` : users, groups, ad, kerberos
     * `files.md`
@@ -78,4 +78,4 @@ Most parts are not commited yet, this is a work under construction.
     * `os.md`: packages, chocolatey, service, environment
     * `network.md`: powershell winrm, rds, rdg
     * `time-date-units.md`
-    * `shell, console, desktop`: Keyboard shortcuts, console configuration, user profile
+    * `shell, console, desktop`: keyboard shortcuts, console configuration, user profile
