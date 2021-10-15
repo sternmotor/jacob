@@ -1,0 +1,146 @@
+#!/bin/bash
+
+# TODO: check age of problem markers, ignore outdated data
+
+set -o nounset
+set -o pipefail
+
+# load config file
+    BaseCheckConfig='/etc/rzwatch.conf'
+    . "$BaseCheckConfig"
+
+# constants
+    SSHOptions="-o ConnectTimeOut=5 -o ControlPath=~/.ssh/persistent-$$ -o ControlMaster=auto -o ControlPersist=600"
+    Now=$(date +%s) # date in seconds
+    ProblemMarker="$ThisProxy::Problem"
+    SMSMarker="$ThisProxy::SendingSMS"
+
+
+# sleep for some seconds to avoid race condition dealing with other proxys
+# e.g. sending sms multiple times
+    Delay=$(( $RANDOM % 30  ))
+    echo "Waiting $Delay seonds"
+    sleep  $Delay
+
+# helper function
+run_on_mesh () { # run a command over ssh on all mesh proxes
+    local CMD="$@"
+    for Proxy in $Proxies; do
+            UserAddress=$( echo "$Proxy" | cut -d ':' -f1  )
+            Port=$( echo "$Proxy" | cut -d ':' -f2  )
+            echo  "Connecting \"ssh $SSHOptions $UserAddress -p $Port\""
+            ssh $SSHOptions $UserAddress -p $Port "set -o nounset; $CMD" 2>&1
+    done
+}
+
+send_sms() {
+    # Send SMS
+    local MailRecipient=""
+
+    for MailRecipient in $MailRecipients; do
+        echo "Sending SMS via mail to \"$MailRecipient\""
+        echo "" | mailx -A "$MailProfile" -s "$MailSubject" "$MailRecipient"
+    done
+}
+
+check_thisproxy_sms() {
+    # if SMS marker from this proxy still exists, remove it
+    local NumberProblems=$1
+    if ls "$MarkerDir/"*"$SMSMarker" 2>/dev/null; then
+        run_on_mesh "
+            # Remove SMS marker, only NumberOfProblems errors detected ...
+            echo 'Removing SMS marker, "$ThisProxy" detected only $NumberProblems errors'
+            rm -f '$MarkerDir/'*'::$SMSMarker' > /dev/null 2>&1
+        "
+    fi
+}
+
+# check connection to zabbix server (whole chain)
+    ZabbixSenderOptions="\
+     --zabbix-server $ZabbixServerAddress\
+     --port $ZabbixServerPort\
+     --host $ZabbixHost\
+     --key $ZabbixKey\
+     --value $ZabbixValue\
+    "
+    zabbix_sender $ZabbixSenderOptions >/dev/null 2>&1 
+    ZabbixSenderErrorCode=$?
+
+# main loop
+if [[ $ZabbixSenderErrorCode -gt 0 ]]
+then
+        # connect to all proxies, tell them i have a problem
+        echo "Detected local zabbix server errors"
+        run_on_mesh "
+            set -o nounset
+            # Create lokal problem marker: move old marker ...
+            echo 'Updating problem marker sent from $ThisProxy'
+            if ls '$MarkerDir/'*'::$ProblemMarker' > /dev/null 2>&1; then
+                    mv  '$MarkerDir/'*'::$ProblemMarker' '$MarkerDir/$Now::$ProblemMarker'
+            else
+                    # ... or create initial one
+                    touch '$MarkerDir/$Now::$ProblemMarker'
+            fi
+        "
+
+        # check if other proxies have problems, too
+        NumberOfProblems=$( ls "$MarkerDir/"*"::Problem" 2>/dev/null | wc -l )
+        if [[ $NumberOfProblems -ge $BadNumberOfProblems ]]  
+        then
+            # An SMS needs to be sent
+            if ls "$MarkerDir/"*"::SendingSMS" > /dev/null 2>&1
+            then
+                # Some other proxy is taking care, do nothing (log only)
+                SMSSender=$( ls "$MarkerDir/"*"::SendingSMS" | cut -d ':' -f3 )
+                echo "Detected $NumberOfProblems zabbix server errors, \"$SMSSender\" is sending SMS already"
+
+            else
+                # Tell other proxies I am sending SMS
+                echo "Detected $NumberOfProblems zabbix server errors, sending SMS"
+                run_on_mesh "
+                    # Create lokal sms marker: move old marker ...
+                    echo 'Updating SMS marker: sms send from $ThisProxy'
+                    if ls '$MarkerDir/'*'::$SMSMarker' > /dev/null 2>&1 ; then
+                            mv  '$MarkerDir/'*'::$SMSMarker' '$MarkerDir/$Now::$SMSMarker'
+                    else
+                            # ... or create initial one
+                            touch '$MarkerDir/$Now::$SMSMarker'
+                    fi
+                "
+                send_sms
+            fi
+        else
+            echo "Detected $NumberOfProblems problem(s) - not enough for SMS escalation"
+            # if SMS marker from this proxy still exists, remove it
+            check_thisproxy_sms $NumberOfProblems
+        fi
+else
+        # no lokal problem ...
+        # ... anymore but there had been one recently or ...
+        if ls "$MarkerDir/"*"::$ProblemMarker" > /dev/null 2>&1; then
+
+            # remove problem marker on remote proxies but keep sms markers
+            echo "Zabbix errors vanished, removing remote proxy problem markers"
+            run_on_mesh "
+                echo 'Removing marker for problem at $ThisProxy'
+                rm --force '$MarkerDir/'*'::$ProblemMarker'
+            "
+
+        elif ls "$MarkerDir/"* > /dev/null 2>&1; then
+            # see if any remote proxy still sees problems
+            RemoteAndLocalProblems=$( ls "$MarkerDir/"*"::Problem" 2> /dev/null | wc -l )  
+            if [[ $RemoteAndLocalProblems -gt 0 ]]
+            then
+                echo "No Zabbix errors locally but $RemoteAndLocalProblems remote problems still exist"
+                check_thisproxy_sms $RemoteAndLocalProblems
+            else
+                # no more remote problems - remove lokal problem and sms marker
+                echo "Zabbix errors vanished locally and remote - cleaning up completely"
+                rm --force "$MarkerDir/"*
+            fi
+        # ... no problem in sight at all: normal operation, do nothing
+        else
+            echo "No errors, no problem markers - fine, continueing"
+        fi
+fi
+

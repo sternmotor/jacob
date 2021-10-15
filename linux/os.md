@@ -17,6 +17,9 @@ Shutdown without acpi hang up at end of shutdown process (`halt` problem)
 
     systemctl poweroff
 
+Parseable list of installed services
+
+    systemctl --type=service --plain --no-legend
 
 ### Logging
 
@@ -53,7 +56,9 @@ Enable persistent journald log (to compare boot process messages)
 Links:
 * [Systemd Introduction]( https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-units)
 * [Systemd Units]( https://www.freedesktop.org/software/systemd/man/systemd.service.html)
+* Systemd Exec options: (e.g. LimitNOFile): `man systemd.exec`
 * [Systemd python inotify](https://pypi.python.org/pypi/sdnotify) and [SD Notify](https://www.freedesktop.org/software/systemd/man/sd_notify.html#)
+
 
 Unit file
 `Type`

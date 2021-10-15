@@ -1,11 +1,9 @@
 #!/bin/sh -eu
+# Usage: this-script HOST1 [HOST2] [HOSTn]"
+# 
+# Shows collected facts for given host(s)"
 LANG=C
 
-usage() {
-    echo "Usage: $(basename "$0") HOST1 [HOST] [HOSTn]"
-    echo
-    echo "Shows collected facts for given host(s)"
-}
 
 
 # contants
@@ -13,7 +11,8 @@ REDIS_CONTAINER=ansible-redis
 SCRIPT_PATH="$(readlink -e "$0")"
 
 
-# check input, collect warning_sbm and critical_sbm
+# collect options and parameters
+usage() { awk -F '# ' '!NF{exit}{print $2}' "$0"; } # filter script comment
 while [ $# -gt 0 ]; do
 
     case "$1" in
@@ -28,6 +27,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# validate input
 
 # set up tempdir and auto-removal
 TEMP_DIR=$(mktemp -d --suffix="$(basename "$0")")

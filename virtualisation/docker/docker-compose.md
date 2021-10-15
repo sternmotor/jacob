@@ -13,7 +13,7 @@ Logging
       driver: json-file
       options:  
         max-size: '100m'
-        max-file: '10'
+        max-file: '7'
 
 
 Services management

@@ -12,9 +12,15 @@ Set user password to not-expire
 Hosts
 -----
 
+
+Create dns zone and reverse zone
+    kinit
+    ipa dnszone-add zone.example.net --allow-sync-ptr=TRUE
+    ipa dnszone-add 19.21.10.in-addr.arpa.
+
 Create host and reverse dns
 
 	kinit
-	ipa dnsrecord-add app.infra.gs.xtrav.de otrs --a-rec 192.168.106.46
-	ipa dnsrecord-add 106.168.192.in-addr.arpa 46 --ptr-rec otrs.app.infra.gs.xtrav.de.
-	nslookup 192.168.106.46
+    ipa dnsrecord-add zone.example.net hostname --a-rec 10.21.19.10
+    ipa dnsrecord-add 10.19.21.10.in-addr.arpa 46 --ptr-rec host.zone.example.net.
+	nslookup 10.21.19.10

@@ -104,6 +104,7 @@ def exit_handler(signal, stackframe=None):
     sys.exit(signal)
 signal.signal(signal.SIGINT, exit_handler)
 signal.signal(signal.SIGTERM, exit_handler)
+signal.signal(signal.SIGEXIT, exit_handler)
 
 
 # APPLICATION LOGIC
@@ -133,3 +134,6 @@ except Exception:
 
 else:
     exit_handler(os.EX_OK)
+
+# GMA 2021
+# vim: ts=4:sw=4:ft=python:et

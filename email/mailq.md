@@ -1,6 +1,10 @@
 Mail Queue
 ==========
 
+See all mails queued
+
+    mailq
+
 Get mail by id
 
 	postcat -q 623301E0

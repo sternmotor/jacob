@@ -40,30 +40,96 @@ Create database and user with full access to it
 
     DB_NAME="some_database" 
     DB_PASS="$(pwgen -sync 20 1)"
-
     psql -U postgres -c "CREATE DATABASE $DB_NAME" \
     && psql -U postgres -c "CREATE USER $DB_NAME PASSWORD '$DB_PASS'" \
     && psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_NAME" 
 
 
-Read-only user for all databases (including `template1`, thus new databases get the same permissions)
+Read-only user for all databases (including `template1`, thus new databases get the same permissions) - do  not forgte to adjust pg_hba.conf
 
-    USER='pgadmin'
-    PASS='xxx'
+```
+USER=remote_user
+PASS='xxxxxx2Faiv)ai(Xeva'
 
-    psql -U postgres -tc "CREATE ROLE $USER LOGIN PASSWORD '$PASS'"
-    psql -U postgres -tc "SELECT datname from pg_database where datname not in ('template0', 'postgres')" \
-    | while read db; do 
-        [[ -z "$db" ]] && continue
-        echo -n "* $db ... " \
-        && psql -U postgres -d "$db" -c "GRANT USAGE ON SCHEMA public TO $USER" >/dev/null \
-        && psql -U postgres -d "$db" -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO $USER" >/dev/null  \
-        && psql -U postgres -d "$db" -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO $USER" >/dev/null \
-        && psql -U postgres -d "$db" -c "ALTER DEFAULT PRIVILEGES  GRANT SELECT ON TABLES TO $USER" >/dev/null  \
-        && echo "ok" || echo 'ERROR !!'
-    done
 
-    
+psql -U postgres -tc "CREATE ROLE $USER LOGIN PASSWORD '$PASS' VALID UNTIL 'infinity'"
+psql -U postgres -tc "ALTER ROLE $USER NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE NOREPLICATION"
+psql -U postgres -tc "SELECT datname from pg_database where datname not in ('template0', 'postgres')" \
+| while read db; do
+    [[ -z "$db" ]] && continue
+    echo -n "* $db ... " \
+    && psql -U postgres -c "GRANT CONNECT ON DATABASE $db TO $USER" >/dev/null \
+    && psql -U postgres -d "$db" -c "GRANT USAGE ON SCHEMA public TO $USER" >/dev/null \
+    && psql -U postgres -d "$db" -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO $USER" >/dev/null  \
+    && psql -U postgres -d "$db" -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO $USER" >/dev/null \
+    && psql -U postgres -d "$db" -c "ALTER DEFAULT PRIVILEGES  GRANT SELECT ON TABLES TO $USER" >/dev/null  \
+    && echo "ok" || echo 'ERROR !!'
+done
+```
+
+next, edit `pg_hba.conf` and reload like
+
+    psql -U postgres -tc 'SELECT pg_reload_conf()'
+
+
+Replication
+-----------
+
+
+MASTER:
+
+    ALLOWED_NETWORK=10.25.1.0/24
+    REPLICATION_PASSWORD="$(pwgen -ync 24 1)"
+    DATA_DIR="$(psql -U postgres -qAtXc 'SHOW data_directory')"
+    echo "REPLICATION_PASSWORD='$REPLICATION_PASSWORD'"
+    psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
+    psql -U postgres -c "
+        DROP ROLE IF EXISTS replicator;
+        CREATE ROLE replicator LOGIN REPLICATION ENCRYPTED PASSWORD '$REPLICATION_PASSWORD';
+        SELECT pg_create_physical_replication_slot('replicator');
+    "
+    if ! grep -qw replicator "$DATA_DIR/pg_hba.conf"; then
+        echo "host replication replicator $ALLOWED_NETWORK md5" >> "$DATA_DIR/pg_hba.conf"
+        psql -U postgres -c "SELECT pg_reload_conf()"
+    fi
+
+
+SLAVE:
+
+    MASTER=dbmaster.example.com
+    REPLICATION_PASSWORD='xxxx'    # same as MASTER
+    DATA_DIR="$(psql -U postgres -qAtXc 'SHOW data_directory')"
+    SERVICE=$(systemctl --type=service --plain --no-legend | awk '/postgresql/{print $1}')
+    systemctl stop $SERVICE
+    rm -rf "$DATA_DIR"
+    echo "$MASTER:*:replication:replicator:$REPLICATION_PASSWORD" > ~/.pgpass
+    chmod 600 ~/.pgpass
+    pg_basebackup \
+        --host $MASTER \
+        --username replicator \
+        --no-password \
+        --slot replicator \
+        --pgdata="$DATA_DIR" \
+        --write-recovery-conf \
+        --progress
+    chown -R postgres:postgres "$DATA_DIR"
+    systemctl start $SERVICE
+
+
+Check slave status
+
+     psql -U postgres -Axc 'select * from pg_stat_wal_receiver;'
+
+
+Caclulate replication delay
+
+    psql -U postgres -Axc '
+        SELECT CASE WHEN pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()
+        THEN 0
+        ELSE EXTRACT (EPOCH FROM now() - pg_last_xact_replay_timestamp())
+        END AS log_delay;
+    '
+
 
 
 Config

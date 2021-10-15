@@ -30,3 +30,4 @@ retrieve exception stack trace as multi-line string
         some-dangerous-code
     except Exception:
         sys.stderr.write(traceback.format_exc())
+

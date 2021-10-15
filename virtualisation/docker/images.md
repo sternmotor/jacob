@@ -33,7 +33,7 @@ run `CMD=` or `--command=` directly
 
 
     #!/bin/sh -eu
-    LANG=C.utf8
+    LANG=C
     TZ=${TZ:-Europe/Berlin}
     PUID="${PUID:-1000}"
     PGID="${PGID:-1000}"
@@ -78,6 +78,27 @@ run `CMD=` or `--command=` directly
     echo "* $0: Launching \"$@\""
     #exec sudo -Eu $PUSER "$@"
     exec "$@"
+
+
+Other approach: specify `ENTRYPOINT` *and* default `CMD` in Dockerfile, have entrypoint follow this logic (example: sshd service is running `borg serve` on SSH client connect):
+
+
+* Dockerfile:  `CMD = "sshd -e -D"`
+* entrypoint script: `$@` cannot be empty since CMD is specified
+
+        if $1 = "sshd":
+            prepare-user-accounts
+            exec $@
+
+        elif $1 <> "sshd" but executable (e.g. `bash` or `sh` or `borg`)
+            exec $@
+
+        elif $1 not executable
+            run borg with command/option $@ for adminsitration
+
+        else ($1="", triggered by `--command=''`
+            display borg version
+
 
 
 Dockerfile snippets

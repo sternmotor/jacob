@@ -239,3 +239,21 @@ child = pexpect.spawn('scp foo myname@host.example.com:.')
 child.expect ('Password:')
 child.sendline (mypassword)
 
+
+# subprocess timeout - not tested !!!!!!!!!
+proc = subprocess.Popen(['megacli', '-PdList', 'aAll'], encoding='UTF-8', stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+timer = threading.Timer(2, proc.kill)
+try:
+    timer.start()
+    out1 = proc.communicate()[0]
+except subprocess.TimeoutExpired:
+    out2 = proc.communicate()[0]
+finally:
+    timer.cancel()
+
+print(out1)
+print(out2)
+
+
+
+

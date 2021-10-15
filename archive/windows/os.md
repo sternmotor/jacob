@@ -152,7 +152,7 @@ List of essential variables
 
 
 
-## In​haltsverzeichnis
+## Inhaltsverzeichnis
 
 {{ page.toc }}
 

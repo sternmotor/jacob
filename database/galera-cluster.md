@@ -70,6 +70,7 @@ Master data must be  available on one server (backup). Check out [this][der_bode
 
 	systemctl start mariadb
 	journalctl -fu mariadb
+    mysql -Bse "SHOW STATUS LIKE 'wsrep%'"
 
 7. re-initialise other galera nodes
 

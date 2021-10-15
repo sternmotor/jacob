@@ -22,10 +22,16 @@ OS cleanup
 See "Kernel" and "Packages" sections below
 
 
-    sudo journalctl --vacuum-time=7d
-    sudo yum clean all
-    sudo package-cleanup -y --oldkernels --count=2
-    sudo abrt-cli rm /var/spool/abrt/*
+    journalctl --vacuum-time=7d
+    yum clean all
+    package-cleanup -y --oldkernels --count=2
+    package-cleanup --cleandupes
+    # rpm --rebuilddb
+    abrt-cli rm /var/spool/abrt/*
+    yum install -y ca-certificates ssh bash
+    yum --security -y update
+    systemctl restart rsyslog
+    
 
 
 Kernel
@@ -39,12 +45,34 @@ Restrict number of installed kernels to 2:
     package-cleanup -y --oldkernels --count=2
 
 
+Update Centos7 to UEK Oracle LTS kernel 
+
+```
+cat << 'REPO_END' > /etc/yum.repos.d/uek-olx.repo
+[ol7_UEKR6]
+name=Latest Unbreakable Enterprise Kernel Release 6 for Oracle Linux $releasever ($basearch)
+baseurl=https://yum.oracle.com/repo/OracleLinux/OL7/UEKR6/$basearch/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-oracle
+gpgcheck=1
+enabled=1
+REPO_END
+curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-oracle https://yum.oracle.com/RPM-GPG-KEY-oracle-ol7
+yum install https://yum.oracle.com/repo/OracleLinux/OL7/developer/UEKR6/x86_64/getPackage/linux-firmware-20200124-999.4.git1eb2408c.el7.noarch.rpm
+yum install kernel-uek btrfs-progs btrfs-progs-devel
+```
+
+
+
 
 Update to mainline kernel
 
     sudo rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
     sudo rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm 
     sudo yum --enablerepo=elrepo-kernel install -y kernel-ml
+
+
+
+
 
 
 Packages

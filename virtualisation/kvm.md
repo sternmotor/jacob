@@ -47,6 +47,15 @@ In guest, ext4, assuming there is no partition table on disk device:
 
     resize2fs /mountpoint 
 
+In guest, adapt partition table (needs reboot before running `resize2fs /mountpoint`
+
+    parted /dev/vde print free  # note partition number 
+    umount /var/lib/mysql/
+    parted /dev/vde resizepart 1 100%
+    resize2fs /dev/vde1
+    mount /var/lib/mysql
+    systemctl restart mariadb
+
 In guest, btrfs:
 
     btrfs filesystem resize max /srv
@@ -56,6 +65,13 @@ In guest, xfs:
 
     xfs_growfs /srv
 
+In guest, maximize last partition to use free space
+
+    umount -l <mountpoint>
+    parted /dev/vde print free  # note partitoin number
+    parted -s /dev/vde "resizepart 2 -1" quit
+    parted /dev/vde print free
+    # grow filesystem ext4, xfs, btrfs like above
 
 Limit IOPs and bandwith for operations on disks
 
@@ -73,19 +89,6 @@ Limit IOPs and bandwith for operations on disks
 Check disk throughput
 
     virsh qemu-monitor-command <GUEST> --hmp "info block"
-
-Security
--------
-
-[BSI recommendations](https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/Studien/Sicherheitsanalyse_KVM/Sicherheitsanalyse_KVM.pdf?__blob=publicationFile&v=3):
-
-* activate selinux 
-* deactivate KSM
-* remove "default" nat-bridge
-* run all bridges without host-ip
-* deactivate ip_forward 
-* enable reverse path filter
-
 
 Disable kvm host swapping when vm mem is low
 --------------------------------------------
@@ -114,6 +117,20 @@ Make sure `/sys/devices/system/clocksource/clocksource0/current_clocksource` is 
 > ... Interrupts cannot always be delivered simultaneously and instantaneously to all guest virtual machines. This is because interrupts in virtual machines are not true interrupts. Instead, they are injected into the guest virtual machine by the host machine.
 ...
 To avoid the problems described above, the Network Time Protocol (NTP) should be configured on the host and the guest virtual machines ...
+
+Security
+-------
+
+[BSI recommendations](https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/Studien/Sicherheitsanalyse_KVM/Sicherheitsanalyse_KVM.pdf?__blob=publicationFile&v=3):
+
+* activate selinux 
+* deactivate KSM
+* remove "default" nat-bridge
+* run all bridges without host-ip
+* deactivate ip_forward 
+* enable reverse path filter
+
+
 
 
 [kvm_clock]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/virtualization_administration_guide/sect-virtualization-tips_and_tricks-libvirt_managed_timers]

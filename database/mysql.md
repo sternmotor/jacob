@@ -18,6 +18,35 @@ Retrieve config options in shell
     | awk '/^datadir/{print $2}'
 
 
+
+Users
+-----
+
+Reset root password
+
+    systemctl stop mariadb
+    mysqld_safe --skip-grant-tables &
+    mysql -e "UPDATE mysql.user SET Password=PASSWORD('new-password') WHERE User='root'"
+    mysql -e "FLUSH PRIVILEGES"
+    mysqladmin shutdown
+    systemctl start mariadb
+
+Drop all users with bad host specification
+
+    mysql -Bse "select user,host from mysql.user WHERE user = 'nagios' AND  host != '%'" \
+    | while read u h; do 
+        echo "removing ${u}@$h"
+        mysql -e "DROP USER '${u}'@'$h'"
+    done
+    mysql -e "FLUSH PRIVILEGES"
+
+Create monitoring user
+
+    mysql -e "
+    GRANT PROCESS,SHOW VIEW,REPLICATION CLIENT,SELECT,SHOW DATABASES ON *.* to nagios@'%' IDENTIFIED BY PASSWORD '*599FA96B9EF18A97585DE37CE9AA8B7CA751EAC7';
+    FLUSH PRIVILEGES;
+    "
+
 Profiling, performance
 ----------------------
 
@@ -40,6 +69,8 @@ Group mapping ldap-mariadb: [here][ldap]
 Replication
 -----------
 
+### General
+
 Switch slave to master - adapt `/etc/my.cnf` (server_id, binlogs)  and restart
 mysql/mariadb after these steps:
 
@@ -59,13 +90,42 @@ Show mysql slave status
     | grep -wE '(Last_SQL_Error|Seconds_Behind_Master|Slave_IO_Running|Slave_SQL_Running)'
 
 
+### Re-initialise replication
+
+
+Preparation
+
+INCLUDE_DBs=
+NO_DATA_DBs=
+EXCLUDE_DBs=
+
+
+Master: set up replication user
+
+Master: dump no-data databases
+
+Master: dump data with binlog position 
+
+    mysqldump \
+    --add-drop-database \
+    --hex-blob \
+    --routines \
+    --single-transaction \
+    --triggers \
+    --databases 
+
+
+
+
+
+
+
 
 Requirements for master-slave replication
 
 1. master has binlogs enabled `log-bin = mysql-bin`, validate: `SHOW BINARY LOGS`
-2. master has `server-id = 1`, validate: `SHOW VARIABLES LIKE "server_id"`
-3. slave has minimum `server-id = 2`, validate: `SHOW VARIABLES LIKE "server_id"` 
-4. package `zstd` (fast archiver) is installed on master and server
+2. master has `server-id = 1`, validate: `SELECT @@server_id`
+3. slave has minimum `server-id = 2`, validate: `SELECT @@server_id` 
 5. schemas which need to be excluded from replication are configured like
    `replicate_ignore_db = temp_db`
 
