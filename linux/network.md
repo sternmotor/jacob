@@ -22,6 +22,11 @@ Transfer an file as-is (no compression)
     time ssh <source_host> "cat /srv/dump.pgsql.gz" | pv | ssh target "cat - > /mnt/dump.pgsql.gz"
 
 
+Fast rsync for initial sync: use scp -r or
+
+    rsync -aW --size-only
+
+
 Network config
 --------------
 
