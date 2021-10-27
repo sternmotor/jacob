@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+"""
+retrieve postgresql replication/recovery/slave status, check for lag
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+
+EXIT_PASS = 0
+EXIT_WARN = 1
+EXIT_CRIT = 2
+EXIT_UNKN = 3
+
+DEFAULT_MAX_LAG = 1000
+
+# command line options and help
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "-c", "--critical", default = DEFAULT_MAX_LAG, type=int,
+    help='Critical number of slave replication lag in seconds, '
+    'default is {}'.format(DEFAULT_MAX_LAG)
+)
+args = parser.parse_args() # (['-h'])
+
+
+# query status
+status_query = '''
+SELECT
+  pg_is_in_recovery() AS is_slave,
+  pg_last_wal_receive_lsn() AS receive,
+  pg_last_wal_replay_lsn() AS replay,
+  pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() AS synced,
+  (
+    EXTRACT(EPOCH FROM now()) -
+    EXTRACT(EPOCH FROM pg_last_xact_replay_timestamp())
+  )::int AS lag;
+'''
+cmd = ['psql', '-U', 'postgres', '-txc', status_query]
+
+try:
+    status_raw = subprocess.check_output(cmd).decode().strip()
+except OSError as err:
+    print('Error running "{} <QUERY>": {}'.format(
+        ' '.join(cmd[:-1]), err.strerror)
+    )
+    sys.exit(3)
+
+
+# split response into key: value pairs
+for line in status_raw.split(os.linesep):
+    key, sep, val = line.split()
+    try:
+        status[key] = val
+    except NameError:
+        status = {key: val}
+
+
+# analysis
+if status['is_slave'] == 'f':
+    print('PostgreSQL instance is not in recovery/slave mode')
+    sys.exit(EXIT_UNKN)
+
+else:
+    print('Recovery/slave lag: {} seconds'.format(int(status['lag'])))
+    if int(status['lag']) > args.critical:
+        sys.exit(EXIT_CRIT)
+    else:
+        sys.exit(EXIT_PASS)
+
+
+# GMA 2021
+# vim: ts=4:sw=4:ft=python:et
