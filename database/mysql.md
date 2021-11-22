@@ -18,6 +18,34 @@ Retrieve config options in shell
     | awk '/^datadir/{print $2}'
 
 
+Memory
+------
+
+Per connection - multiply by `max_connections`
+
+    mysql -e "
+    SELECT (
+      @@read_buffer_size
+    + @@read_rnd_buffer_size
+    + @@sort_buffer_size
+    + @@join_buffer_size
+    + @@binlog_cache_size
+    + @@thread_stack
+    + @@tmp_table_size
+    + 2*@@net_buffer_length) / (1024 * 1024) AS MEMORY_PER_CON_MB
+    "
+
+
+    mysql -Be "
+        SELECT @@read_buffer_size / (1024 * 1024) as read_buffer_size;
+        SELECT @@sort_buffer_size / (1024 * 1024) as sort_buffer_size;
+        SELECT @@join_buffer_size / (1024 * 1024) as join_buffer_size;
+        SELECT @@read_rnd_buffer_size / (1024 * 1024) as read_rnd_buffer_size;
+        SELECT @@binlog_cache_size / (1024 * 1024) as binlog_cache_size;
+        SELECT @@thread_stack / (1024 * 1024) as thread_stack;
+        SELECT @@tmp_table_size / (1024 * 1024) as tmp_table_size;
+        SELECT @@net_buffer_length * 2 / (1024 * 1024) as net_buffer;
+    "
 
 Users
 -----
@@ -52,7 +80,11 @@ Profiling, performance
 
 Queries and processes
 
-    SHOW FULL PROCESSLIST
+    > SHOW FULL PROCESSLIST
+
+or
+
+    mytop -dmysql
 
 Single database size
 
@@ -60,6 +92,51 @@ Single database size
     FROM INFORMATION_SCHEMA.TABLES
     WHERE TABLE_SCHEMA = "<DATABASE>"
 
+Check tables with n o primary key: may slow down replication
+
+    mysql -e "
+    SELECT tables.table_schema, 
+           tables.table_name, 
+           tables.table_rows 
+    FROM   information_schema.tables 
+           LEFT JOIN (SELECT table_schema, 
+                             table_name 
+                      FROM   information_schema.statistics 
+                      GROUP  BY table_schema, 
+                                table_name, 
+                                index_name 
+                      HAVING Sum(CASE 
+                                   WHEN non_unique = 0 
+                                        AND nullable != 'YES' THEN 1 
+                                   ELSE 0 
+                                 end) = Count(*)) puks 
+                  ON tables.table_schema = puks.table_schema 
+                     AND tables.table_name = puks.table_name 
+    WHERE  puks.table_name IS NULL 
+           AND tables.table_schema NOT IN ( 'mysql', 'information_schema', 
+                                            'performance_schema' 
+                                            , 'sys' ) 
+           AND tables.table_type = 'BASE TABLE' 
+           AND engine = 'InnoDB';
+    "
+
+Check maximum  memory usage per connection
+
+    SELECT ( @@read_buffer_size
+        + @@read_rnd_buffer_size
+        + @@sort_buffer_size
+        + @@join_buffer_size
+        + @@binlog_cache_size
+        + @@thread_stack
+        + @@tmp_table_size
+        + 2*@@net_buffer_length
+        ) / (1024 * 1024) AS MEMORY_PER_CON_MB;
+
+System
+------
+Check maximum number of open files allowed for mysql service user:
+
+    su - mysql -s /bin/sh -c "ulimit -n"
 
 Authentification
 ----------------
@@ -68,6 +145,26 @@ Group mapping ldap-mariadb: [here][ldap]
 
 Replication
 -----------
+
+### Parameters
+
+Master
+    [mysqld]
+    server_id = 1
+    binlog-commit-wait-count=10
+
+Slave
+    [mysqld]
+    server_id = 2
+    innodb_flush_log_at_trx_commit = 2
+	slave_parallel_max_queue= 8MB
+	slave_parallel_mode	aggressive
+	slave_parallel_threads = $(nproc)
+	slave_parallel_workers = $(nproc)
+	gtid_pos_auto_engines = InnoDB,MyISAM
+    #slave-skip-errors=1062
+    #replicate_ignore_db = some_dumb_db
+
 
 ### General
 

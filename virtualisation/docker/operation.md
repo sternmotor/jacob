@@ -1,6 +1,24 @@
 Docker and docker-compose operation
 ===================================
 
+General settings: logging, buildkit, selinux - edit `/etc/docker/daemon.json`
+
+    {
+        "data-root": "/srv/docker",
+        "ip": "0.0.0.0",
+        "log-driver": "json-file",
+        "log-level": "warn",
+        "log-opts": {
+            "max-file": "3",
+            "max-size": "2M",
+            "mode": "non-blocking"
+        },
+        "selinux-enabled": false,
+        "features": { 
+            "buildkit": true }
+        }
+    }
+
 Ressources
 ----------
 

@@ -78,6 +78,9 @@ Replication
 -----------
 
 
+!!! Check out: https://www.postgresql.org/docs/10/app-pgbasebackup.html
+
+
 MASTER:
 
     ALLOWED_NETWORK=10.25.1.0/24
@@ -204,6 +207,11 @@ Performance testing
 
 Ressources, Tuning
 ------------------
+
+
+Check maximum number of open files allowed for postrgesql service user:
+
+    su - postgres -s /bin/sh -c "ulimit -n"
 
 IOPs
 
