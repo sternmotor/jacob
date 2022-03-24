@@ -18,37 +18,20 @@ Retrieve config options in shell
     | awk '/^datadir/{print $2}'
 
 
-Memory
-------
 
-Per connection - multiply by `max_connections`
-
-    mysql -e "
-    SELECT (
-      @@read_buffer_size
-    + @@read_rnd_buffer_size
-    + @@sort_buffer_size
-    + @@join_buffer_size
-    + @@binlog_cache_size
-    + @@thread_stack
-    + @@tmp_table_size
-    + 2*@@net_buffer_length) / (1024 * 1024) AS MEMORY_PER_CON_MB
-    "
-
-
-    mysql -Be "
-        SELECT @@read_buffer_size / (1024 * 1024) as read_buffer_size;
-        SELECT @@sort_buffer_size / (1024 * 1024) as sort_buffer_size;
-        SELECT @@join_buffer_size / (1024 * 1024) as join_buffer_size;
-        SELECT @@read_rnd_buffer_size / (1024 * 1024) as read_rnd_buffer_size;
-        SELECT @@binlog_cache_size / (1024 * 1024) as binlog_cache_size;
-        SELECT @@thread_stack / (1024 * 1024) as thread_stack;
-        SELECT @@tmp_table_size / (1024 * 1024) as tmp_table_size;
-        SELECT @@net_buffer_length * 2 / (1024 * 1024) as net_buffer;
-    "
 
 Users
 -----
+
+Create user with full access to db
+
+    CREATE USER 'seafile'@'%' IDENTIFIED BY 'xxxxx';
+    GRANT ALL PRIVILEGES ON mysql_seafile.* TO 'seafile'@'%';
+    FLUSH PRIVILEGES;
+
+    CREATE USER 'root'@'%' IDENTIFIED BY 'xxxxx';
+    GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
+    FLUSH PRIVILEGES;
 
 Reset root password
 
@@ -75,8 +58,26 @@ Create monitoring user
     FLUSH PRIVILEGES;
     "
 
+
+
+
 Profiling, performance
 ----------------------
+
+
+mytop -dmysql
+
+* replication slave: 
+    * "Waiting for work from SQL thread", "Not enough room": check `slave_parallel_max_queued`
+    * row based binlog writing at master helps
+
+
+
+
+Target: make all indexes fit into memory
+
+innodb-buffer-pool-size = 0.8 * (All RAM - 2GB System - 20MB * max_connections)
+
 
 Queries and processes
 
@@ -86,13 +87,48 @@ or
 
     mytop -dmysql
 
-Single database size
 
+Validate memory overcommit - find out reserved memory, compare against
+available mem
+
+    top -n1 | awk '/mysqld/{print $5}'
+    free -g
+
+
+Single database size in MB
+    mysql -Bse "
     SELECT SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024))
     FROM INFORMATION_SCHEMA.TABLES
     WHERE TABLE_SCHEMA = "<DATABASE>"
+    "
 
-Check tables with n o primary key: may slow down replication
+All databases sizes in MB 
+
+    mysql -e '
+    SELECT table_schema AS "Database", 
+    SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024)) 
+    AS "Size [MB]"
+    FROM INFORMATION_SCHEMA.TABLES
+    GROUP BY table_schema
+    '
+
+Single table size in MB
+    db=
+    tb=
+    mysql -Bse "
+    SELECT table_name AS 'Table',
+    round(((data_length + index_length) / 1024 / 1024)) 'Size in MB'
+    FROM information_schema.TABLES
+    WHERE table_schema = '$db'
+    AND table_name = '$tb'
+    "
+
+
+
+
+
+
+Check tables with no primary key: may slow down replication
 
     mysql -e "
     SELECT tables.table_schema, 
@@ -120,9 +156,13 @@ Check tables with n o primary key: may slow down replication
            AND engine = 'InnoDB';
     "
 
-Check maximum  memory usage per connection
 
-    SELECT ( @@read_buffer_size
+Memory per connection - multiply by `max_connections`, most important
+is `tmp_table_size=16MB`
+
+    mysql -e "
+    SELECT (
+          @@read_buffer_size
         + @@read_rnd_buffer_size
         + @@sort_buffer_size
         + @@join_buffer_size
@@ -130,7 +170,8 @@ Check maximum  memory usage per connection
         + @@thread_stack
         + @@tmp_table_size
         + 2*@@net_buffer_length
-        ) / (1024 * 1024) AS MEMORY_PER_CON_MB;
+    ) / (1024 * 1024) AS MEMORY_PER_CON_MB
+    "
 
 System
 ------
@@ -258,8 +299,8 @@ Requirements for master-slave replication
         mysql-dump --no-data --databases temp_db \
         --add-drop-database \
         --single-transaction \  
-        | zstd -T0 \
-        | ssh sqlslave.example.com "zstd -T0 -dcf | mysql"
+        | zstd -1 \
+        | ssh sqlslave.example.com "zstd -df | mysql"
 
 7. optional: filter databases to be transferred fully from `SHOW DATABASES`,
    skipping non-mysql directories and system databases
@@ -313,7 +354,18 @@ Robust version:
     && grep -q "completed OK" "$DUMPDIR/xtrabackup_prepare.log"
 
 
+Read Lock
+---------
 
+Put whole database to read only mode
+
+    FLUSH TABLES WITH READ LOCK;
+    SET GLOBAL read_only = 1;
+
+Back to normal mode
+
+    SET GLOBAL read_only = 0;
+    UNLOCK TABLES;
 
 SQL queries
 -----------

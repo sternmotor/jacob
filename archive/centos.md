@@ -84,6 +84,10 @@ Cleanup - recovers from several troubles
     package-cleanup --cleandupes
     rpm --rebuilddb
 
+Reinstall all packages (in case of interrupted yum run where libs have size "0")
+
+    yum reinstall "*"
+
 
 Install the Remi and EPEL repositories
 
@@ -103,7 +107,11 @@ Installing epel package which cannot be found by `yum search <pkg>`
 
     yum --enablerepo=epel install ncdu
 
+CentOS 8 Problem with outdated package repositories
 
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' \
+    /etc/yum.repos.d/CentOS-*
 
 Generate rpm file from source
 -----------------------------

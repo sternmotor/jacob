@@ -1,0 +1,28 @@
+
+
+Receive mails from imap accounts
+
+    import imaplib
+    import email
+
+    imap_conn = imaplib.IMAP4('mail.exaple.com')
+    imap_conn.login('username', 'xxxx')
+
+    imap_conn.select(mailbox='imap_folder', readonly=True)
+    result, data = imap_conn.search(None, 'SUBJECT "Hello Marta"')
+
+    if result == 'OK':
+        last_ids = data[0].split()[-1 * max_results:]
+        for num in last_ids:
+            typ, data = imap_conn.fetch(num, '(RFC822)')
+            email_data = email.message_from_bytes(data[0][1])
+            date = email_data['Date']
+            subj = email_data['Subject']
+            body = email_data.get_payload()
+            print(f'{date}: {subj}')
+    else:
+        print('Mail receive error')
+
+    imap_conn.close()
+    imap_conn.logout()
+

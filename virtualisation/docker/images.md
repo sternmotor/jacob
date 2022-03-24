@@ -21,6 +21,16 @@ Adapt main process user's UID and GID
     install -o $PUID -g $PGID -m 0750 --directory "$(echo ~www-data)"
 
 
+Run ssh client in container, use ssh persistence and forward key agent in
+container - no need to copy ssh stuff into image
+
+    docker run --rm \
+        --volume $SSH_AUTH_SOCK:/ssh-agent \
+        --env SSH_AUTH_SOCK=/ssh-agent \
+        debian:slim ssh-add -l
+
+
+
 Run main process with dropped privileges, pass all env variables
 
     exec sudo -Eu www-data php /var/www/myapp.php "$@"
@@ -120,8 +130,60 @@ Install gosu
 
 Dockerignore
 ------------
+See [Tutorial](https://codefresh.io/docker-tutorial/not-ignore-dockerignore-2)
 
-patterns for `.dockerignore`
+### docker-compose usage pattern
+
+
+Docker ignore pattern for including docker build stuff in code git repository -
+having app and environment combined in single development strain
+
+Example code repository directory structure:
+
+    .dockerignore
+    .env
+    bin                 << php application stuff
+    docker-compose.yml
+    docker/README       << description of how this docker stack is build
+    docker/env.example
+    docker/php-cli
+    docker/php-cli/Dockerfile
+    docker/php-cli/bin
+    docker/php-cli/conf
+    docker/volumes
+    vendor              << php application stuff
+
+Configure `.dockerignore`:
+
+    # exclude git/dev info and docker files from image
+    .env*
+    .git*
+    docker*
+
+    # re-include some dirs in docker build sub-directories
+    !docker/php-cli/bin/*
+    !docker/php-cli/conf/*
+
+
+Configure `docker/php-cli/Dockerfile`, place all code stuff into `/app` in container
+
+    ...
+    COPY . /app  
+    COPY --chown=www-data:www-data docker/php-cli/bin/* /usr/local/bin/
+    ...
+
+In `docker-compose.yml`, specify build like
+
+    build:
+      context: .
+      dockerfile: docker/php-cli/Dockerfile
+      args:
+        ...
+
+
+### Details
+
+Patterns for `.dockerignore`
 
     { term }
     term:
@@ -143,7 +205,7 @@ patterns for `.dockerignore`
     '#' lines starting with this character are ignored: use it for comments
 
 
-ignore, exclude in `.dockerignore` - docker uses the last rule that matches as
+Ignore, exclude in `.dockerignore` - docker uses the last rule that matches as
 the "final" rule
 
     # Ignore everything

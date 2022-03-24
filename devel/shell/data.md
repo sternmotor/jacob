@@ -26,3 +26,15 @@ Create and read assoziative array:
     MYMAP[foo]=bar 
     echo ${MYMAP[foo]}
 
+
+Read from variable line by line
+
+    SSH_PUBKEYS='
+        xxx 1
+        yyy 2
+        zzz 3
+    '
+
+    echo  "$SSH_PUBKEYS" | awk NF | while read -r line; do
+        echo "line: $line"
+    done 

@@ -14,6 +14,10 @@ Run command, strip output
 Databases and user maintenance
 ---------------------------------
 
+Initialise database
+
+    postgresql-12-setup initdb
+
 Login
 
     sudo psql -U postgres
@@ -28,7 +32,7 @@ Enable password less login for root (remotely)
 	#hostname:port:database:username:password
 	<address>:*:*:<user>:<pass>
 
-* user and Host need to match when logging in
+* user and host need to match when logging in
 
     psql -h <address> -U <user>
 
@@ -39,15 +43,19 @@ Enable password less login for root (remotely)
 
 Create database and user with full access to it
 
+    DB_NAME='some_database' 
+    DB_USER="$DB_NAME"
+    DB_PASS="$(pwgen -sync 20 1)" 
+    psql -U postgres -c "CREATE DATABASE $DB_NAME" 
+    psql -U postgres -c "CREATE ROLE $DB_USER PASSWORD '$DB_PASS'" \
+    && psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER" \
+    && psql -U postgres -c "ALTER ROLE $DB_USER WITH LOGIN" \
+    && psql -U postgres -c "ALTER DEFAULT PRIVILEGES FOR ROLE $DB_USER GRANT ALL ON TABLES TO $DB_USER" \
+    && echo "PASSWORD: $DB_PASS"
 
-    DB_NAME="some_database" 
-    DB_PASS="$(pwgen -sync 20 1)"
-    psql -U postgres -c "CREATE DATABASE $DB_NAME" \
-    && psql -U postgres -c "CREATE USER $DB_NAME PASSWORD '$DB_PASS'" \
-    && psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_NAME" 
 
 
-Read-only user for all databases (including `template1`, thus new databases get the same permissions) - do  not forgte to adjust pg_hba.conf
+Read-only user for all databases (including `template1`, thus new databases get the same permissions) - do  not forget to adjust `pg_hba.conf`
 
 ```
 USER=remote_user
@@ -74,59 +82,92 @@ next, edit `pg_hba.conf` and reload like
     psql -U postgres -tc 'SELECT pg_reload_conf()'
 
 
+Alternatively: create db via `postgres` user from shell
+
+    su - postgres
+    createuser -s repmgr
+    createdb repmgr -O repmgr
+
+
 Replication
 -----------
 
+Check [repmgr]https://severalnines.com/database-blog/integrating-tools-manage-postgresql-production() tool which dows all the heavy lifting (STONITH, replication setup)
 
-!!! Check out: https://www.postgresql.org/docs/10/app-pgbasebackup.html
+Get replication state
+
+master:
+
+    psql -U postgres -Axc "
+        SELECT usename,application_name,client_addr,backend_start,state,sync_state 
+        FROM pg_stat_replication" \
+    | column -ts '|'
 
 
-MASTER:
+slave:
 
-    ALLOWED_NETWORK=10.25.1.0/24
-    REPLICATION_PASSWORD="$(pwgen -ync 24 1)"
-    DATA_DIR="$(psql -U postgres -qAtXc 'SHOW data_directory')"
-    echo "REPLICATION_PASSWORD='$REPLICATION_PASSWORD'"
+     psql -U postgres -Axc 'SELECT * FROM pg_stat_wal_receiver' \
+    | column -ts '|'
+
+
+DB transfer
+-----------
+
+Pull data from source to target and enable replication, check out: https://www.postgresql.org/docs/10/app-pgbasebackup.html
+
+Source: install replication user on source server
+
     psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
-    psql -U postgres -c "
+    REPLICATION_PASSWORD="$(
+        tr -dc '[:graph:]' < /dev/urandom | tr -d "'\"" | fold -w 24 | head -n 1
+    )" \
+    && psql -U postgres -c "
         DROP ROLE IF EXISTS replicator;
         CREATE ROLE replicator LOGIN REPLICATION ENCRYPTED PASSWORD '$REPLICATION_PASSWORD';
         SELECT pg_create_physical_replication_slot('replicator');
-    "
-    if ! grep -qw replicator "$DATA_DIR/pg_hba.conf"; then
-        echo "host replication replicator $ALLOWED_NETWORK md5" >> "$DATA_DIR/pg_hba.conf"
-        psql -U postgres -c "SELECT pg_reload_conf()"
-    fi
+    " \
+    && echo "REPLICATION_PASSWORD='$REPLICATION_PASSWORD'" \
+    || echo "ERROR!"
 
 
-SLAVE:
+Source: enable `replication` user login to this server
 
-    MASTER=dbmaster.example.com
-    REPLICATION_PASSWORD='xxxx'    # same as MASTER
-    DATA_DIR="$(psql -U postgres -qAtXc 'SHOW data_directory')"
-    SERVICE=$(systemctl --type=service --plain --no-legend | awk '/postgresql/{print $1}')
-    systemctl stop $SERVICE
-    rm -rf "$DATA_DIR"
-    echo "$MASTER:*:replication:replicator:$REPLICATION_PASSWORD" > ~/.pgpass
-    chmod 600 ~/.pgpass
-    pg_basebackup \
-        --host $MASTER \
-        --username replicator \
-        --no-password \
-        --slot replicator \
-        --pgdata="$DATA_DIR" \
-        --write-recovery-conf \
-        --progress
+* edit postgres `pg_hba.conf`
+
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    ...
+    host    replication     replicator      10.25.1.109/24          trust
+
+* activate
+
+    psql -U postgres -c "SELECT pg_reload_conf()"
+
+Target: pull database - when asked, enter password from source server, here:
+
+    REPLICATION_PASSWORD=xxx 
+    SOURCE_HOST=db11.app.xibe.rz1.xtrav.de
+    DATA_DIR=/var/lib/postgresql/data
+    pg_basebackup -h $SOURCE_HOST -U replicator --slot replicator \
+    -D "$DATA_DIR" -Fp -Xs -P -R
+
+
     chown -R postgres:postgres "$DATA_DIR"
-    systemctl start $SERVICE
+
+
+
+Target: Optionally stop and disable replication
+
+* from postgres data dir, remove or clear `postgresql.auto.conf`
+* restart postgres
 
 
 Check slave status
 
-     psql -U postgres -Axc 'select * from pg_stat_wal_receiver;'
+     psql -U postgres -Axc 'SELECT * FROM pg_stat_wal_receiver' \
+    | column -ts '|'
 
 
-Caclulate replication delay
+Estimate replication delay
 
     psql -U postgres -txc '
     SELECT
@@ -140,9 +181,36 @@ Caclulate replication delay
       )::int AS lag;
     '
 
+In case there is no output for "lag", the replication is not working. Check logs, then.
+
+Check if replication ist running on system:
+
+* master: display latest wal file (end of listing)
+
+    DATA_DIR="$(psql -U postgres -Atc 'SHOW data_directory')"
+    ls "$DATA_DIR/pg_wal" -ltr
+
+* slave: validate there is a line like `startup   recovering 000000010000003D00000087` and `walreceiver   streaming 3D/XXXXXXXX  ...`
+
+
 
 Config
-------   
+------
+
+Get postgres config settings
+
+    psql -U postgres -c "
+        SELECT name,setting,unit FROM pg_settings
+        WHERE name LIKE '%connection%'
+    "
+
+Set system config in live instance (all databases)
+
+    psql -U postgres -c "
+        ALTER SYSTEM SET work_mem='50MB';
+        SELECT pg_reload_conf();
+    "
+
 
 Show which config settings may be changed by reload and which need server restart
 
@@ -153,13 +221,7 @@ Reload config settings
 
 1. by sending `SIGHUP` to postgres "postmaster" process
 2. `pg_ctl reload` as user "postgres"
-2. `psql -U postgres -c 'SELECT pg_reload_conf()'`
-
-
-Print postgres config settings
-
-    SELECT name,context FROM pg_settings
-
+3. `psql -U postgres -c 'SELECT pg_reload_conf()'`
 
 
 Plugins, Extensions, Modules
@@ -205,8 +267,9 @@ Performance testing
     pgbench -c 10 -S -T 600 -P 1 p gbench
 
 
-Ressources, Tuning
-------------------
+Number of connections:
+
+    psql -U postgres -c "select count(*) from pg_stat_activity"
 
 
 Check maximum number of open files allowed for postrgesql service user:
@@ -220,7 +283,7 @@ io_concurrency
   executed simultaneously. Raising this value will increase the number of I/O
   operations that any individual PostgreSQL session attempts to initiate in
   parallel. The allowed range is 1 to 1000
-* SSD: 100
+* SSD: 200
 * SAS Raid: 50
 
 

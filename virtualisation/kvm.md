@@ -15,6 +15,16 @@ Statistics
 
     virsh qemu-monitor-command <vm_name> --hmp "info block"
 
+
+List all vms
+
+    for i in $(virsh list --name --all); do echo $i; done
+
+List all blockdevices of vm
+
+    virsh domblklist $VM | awk '/\/dev\//{print $2}'
+
+
 CPU, Mem
 --------
 
@@ -90,6 +100,44 @@ Check disk throughput
 
     virsh qemu-monitor-command <GUEST> --hmp "info block"
 
+Transfer KVM config to other host
+---------------------------------
+
+Transfer block devices
+
+    VM=some-vm
+    TARGET=remote-server
+    virsh domblklist $VM | awk '/\/dev\//{print $2}' \
+    | while read DEV; do
+        echo "Transferring block device $DEV"	
+        lv_name=$(LANG=C lvdisplay $DEV | awk '/LV Name/{print $3}')
+        vg_name=$(LANG=C lvdisplay $DEV | awk '/VG Name/{print $3}')
+        # create remote logical volume	
+        size=$(LANG=C lvs --units k --noheadings --options lv_size $DEV)
+        ssh -n $TARGET "lvcreate -Wn --size $size --name $lv_name $vg_name"		
+        # transfer volume data
+        pv $DEV | zstd -T0 --fast | ssh $TARGET "zstd -T0 -dcf > $DEV"
+    done
+
+
+Transfer vm config, start vm on target server
+
+    TARGET=remote-server
+    VM=some-vm
+    virsh dumpxml $VM | pv | ssh $TARGET "cat - > /root/import-$VM.xml"
+    ssh $TARGET "virsh define /root/import-$VM.xml"
+    ssh $TARGET "virsh start $VM"
+
+
+Remove machine on source server after checking that everything is fine
+
+    VM=some-vm
+    virsh destroy $VM
+    lvremove -y $(virsh domblklist $VM | awk '/\/dev\//{print $2}')
+    virsh undefine $VM
+
+
+
 Disable kvm host swapping when vm mem is low
 --------------------------------------------
 
@@ -134,3 +182,6 @@ Security
 
 
 [kvm_clock]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/virtualization_administration_guide/sect-virtualization-tips_and_tricks-libvirt_managed_timers]
+
+
+

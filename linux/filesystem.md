@@ -9,69 +9,56 @@ rsync directory structure, only:
     rsync -av --include='*/' --exclude='*' /path/to/src /path/to/dest/
 
 
-
 Copy devices
 ------------
 
 `dd` progress: specifying a bs= parameter that aligns with the disks buffer memory will get the most performance from the disk.
 
-    dd status=progress 
-
+    dd status=progress ...
 
 
 Pipe transfer of disk devices
 -----------------------------
 
-`dd` usage is not handled here, replaced by `nc`.
+
+### LVM
+
+Short but slower transport: use ssh in a loop
+
+    TARGET=some-server.example.com
+    VG=vg0
+    lvs --noheadings --options lv_name,lv_size \
+    | grep "data" \
+    | while read device size; do
+       ssh -n $TARGET "lvcreate -Wn --size $size --name $device $VG" \
+       && pv /dev/vol1/$device \
+          | zstd -1 \
+          | ssh $TARGET "zstd -dcf > /dev/$VG/$device"
+    done
 
 
-### Create disks with right size on target site
+Fastest transport, manually with no ssh - requires `pv`, `netcat`, `zstd`
 
-LVM example:
+1. source: list volumes and sizes
 
-1. on source host - retrieve size of logical volume to create on remote hostlvdisplay --units k "/dev/$VGNAME/$LVNAME" | LANG=C awk '/LV Size/{print $3}'
+        lvs --noheadings --options lv_name,lv_size
 
-        LANG=C lvs --units k --options lv_name,lv_size
+2. target: create emtpy volume, enable listener, wait for data
 
-2. on destination host:
+        which firewall-cmd 2> /dev/null && firewall-cmd --add-port=7000/tcp
+        lvcreate -Wn --size <vol_size> --name <vol_name> vg0 
+        nc -l 7000 | pv | zstd -dcf  > /dev/vg0/<volname>
 
-        LV_NAME= # << put name fro step 1 here
-        LV_SIZE= # << put value from step 1 here
-        VG_NAME=$(vgs --noheadings --options vg_name | awk '{print $1}')
+3. source: start transfer, requires netcat-openbsd pv zstd 
 
-        LANG=C lvcreate -Wn --size ${LV_SIZE}kiB --name $LV_NAME $VG_NAME
+        pv /dev/vg0/$device | zstd -1 | nc -N <TARGET_HOST> 7000
 
-
-### Transfer disk data
-
-Required packages on both servers:  `zstd`, `pv`, `netcat`
-
-Simple: use slower ssh connection from source to host 
-
-    TARGET=target.example.com
-    pv /dev/$VG_NAME/$LV_NAME | zstd -T0 --fast | ssh $TARGET "zstd -T0 -dcf > /dev/$VG_NAME/$LV_NAME"
-
-
-Fast: using `nc` is faster than ssh but needs a listener to be run on TARGET
-site.  Make sure target and source device have same size. There is no need to
-have a ssh connection between both peers. On source and target, uncompressed
-size is displayed: 
-
-1. on destination host
-
-        nc -l 7000| zstd -T0 --fast -dcf | pv > /dev/$VG_NAME/$LV_NAME
-
-2. on source host
-
-        TARGET=target.example.com
-        LV_NAME= # << put name fro step 1 here
-        VG_NAME=$(vgs --noheadings --options vg_name | awk '{print $1}')
-        pv /dev/$VG_NAME/$LV_NAME | zstd -T0 | nc $TARGET  7000
 
 Option: create and remove LVM snapshot before/after transfer
 
     lvcreate -L 20G -s -n diskname-snap /dev/vg0/diskname
     lvremove /dev/mapper/vg0-diskname-snap
+
 
 
 MBR Partitionen
@@ -121,6 +108,15 @@ Create GPT partition scheme
     && mkfs.ext4 -q -G 4096 -qF -m 0 -L "LIVE_BOOT" ${ROOT_DRIVE}2 \
     && mkfs.ext4 -q -G 4096 -qF -m 5 -L "RESCUE" ${ROOT_DRIVE}3
 
+Make partition accessible directly - for example: mount lvm volumes sub-partitions:
+
+    kpartx -av /dev/vg0/test
+    mount /dev/vg0/test1 /mnt
+    
+Remove mount and mapping
+
+    umount -l /mnt
+    kaprtx -dv /dev/vg0/test
 
 EXT Filesystem
 --------------
@@ -128,6 +124,13 @@ EXT Filesystem
 Expand partition or raw disk's file system to maximum available space
 
     sudo resize2fs /dev/somedisk
+
+
+Shrink file system on partitionless lvm to 50GB
+
+    e2fsck -f /dev/vg0/some_device
+    resize2fs /dev/vg0/some_device 50G
+    lvresize -L 50g /dev/some_device
 
 
 BTRFS Filesystem
@@ -168,10 +171,3 @@ via default acls
 Remove `executable` permissions from file (e.g. in webroot)
 
     find /srv/tokenizer -type f -exec chmod a-x {} \;
-
-
-    
-
-
-
-

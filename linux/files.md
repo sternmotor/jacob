@@ -11,6 +11,10 @@ Remove unprintable characters from variable
 
     tr -dc '[[:print:]]' <<< "$ansible_host"
 
+Compare two files - show differences in two columns
+
+    sdiff -Ws fileA fileB
+
 
 Sed
 ---

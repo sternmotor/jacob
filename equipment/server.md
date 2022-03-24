@@ -37,4 +37,47 @@ DELL
 ----
 
 
+MegaRaid/LSI management
+-----------------------
 
+volume config overview (raid level)
+
+	megacli -LDInfo -Lall -aALL
+
+volume/disk state overview
+
+	megacli -AdpAllInfo -aALL | grep -A 8 "Device Present"
+
+
+locate bad hdds - overview:
+
+	megacli -LDInfo -Lall -aALL | grep "^Name"
+	megacli -PDList -aALL | grep "Enclosure Device" | sort | uniq
+	megacli -PDList -aALL  | grep -E "Slot|Firmware state:|S.M.A.R.T"
+
+locate bad hdds - details
+
+	megacli -PDList -aAll| sed 's/^\(Enclosure Device ID.*\)/--- &1/' \
+	| grep --color=no -E \
+	"Enclo|Slot|Count:|Raw Size:|S.M.A.R.T|Firmware state|Spare|Inquiry Data|---"
+
+
+locate bad hdds physically - blink:
+
+	megacli -PdLocate -start -physdrv[252:2] -a0
+
+observe rebuild
+
+	watch -d -n 20 'megacli -FwTermLog -Dsply -aALL | tail -n 5'
+
+retrieve controller log
+
+    megacli -FwTermLog -Dsply -aALL
+
+bbu charge state
+
+    megacli -AdpBbuCmd  -a0 | egrep "Relative State of Charge|Charging Status"
+
+get controller writeback / cache policy
+
+    megacli -LDInfo -Lall -Aall | grep "Cache Policy"

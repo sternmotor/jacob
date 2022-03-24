@@ -4,7 +4,7 @@ Linux OS
 
 View kernel messages with readable timestamp
 
-    dmesg -HT
+    dmesg -T
 
 
 SystemD
@@ -191,6 +191,36 @@ Show which processes use swap
         }' \
     {} \;
 
+
+
+### Shared Memory
+
+Read [here][shm_intro] - good overview
+
+* available total shared memory
+
+    cat /proc/sys/kernel/shmall
+
+* max bytes for a shared memory segment
+
+    cat /proc/sys/kernel/shmmax
+
+* max number of shared mem segments
+
+    cat /proc/sys/kernel/shmmni
+
+* list all shared memory segments
+
+    ipcs -m
+
+* show processes using segments, cpid= createor pid, lpid = last detached process
+
+    ipcs -pm
+
+
+
+[shm_intro]: https://datacadamia.com/os/linux/shared_memory
+
 Hardening
 ---------
 
@@ -231,6 +261,40 @@ Show  glibc version
 
     ldd --version
 
+
+Cron jobs
+---------
+
+    SHELL=/bin/bash
+    PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin
+    MAILTO=root
+    # Example of job definition:
+    # .---------------- minute (0 - 59)
+    # |  .------------- hour (0 - 23)
+    # |  |  .---------- day of month (1 - 31)
+    # |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+    # |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+    # |  |  |  |  |
+    # *  *  *  *  * user-name  command to be executed
+
+
+Logrotation
+-----------
+
+Edit `/etc/logrotate.d/somelog` - needs `pigz` parallel compressor tool
+
+    /var/log/somelog
+    {
+        compress
+        delaycompress
+        compresscmd /usr/bin/pigz
+        copytruncate
+        daily
+        missingok
+        notifempty
+        rotate 5
+        size 64M
+    }
 
 Resetting linux server identity
 -------------------------------

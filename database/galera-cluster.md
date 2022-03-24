@@ -1,6 +1,16 @@
 Galera Cluster Operation
 ========================
 
+Check cluster state
+
+    mysql -e "SHOW STATUS LIKE 'wsrep_cluster_%'"
+
+* node status: `wsrep_cluster_status`
+* number of active members: `wsrep_cluster_size`
+* cluster id - must be the same on all nodes: `wsrep_cluster_state_uuid`
+* check if node is part of primary component when this number is the same on all nodes: `wsrep_cluster_conf_id`
+
+
 
 Set up replication
 ------------------ 
