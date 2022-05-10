@@ -20,6 +20,20 @@ Copy devices
 Pipe transfer of disk devices
 -----------------------------
 
+### General
+
+slow but convient via ssh 
+
+    pv /dev/sdb | zstd -1 | ssh some_host.example.com 'zstd -dcf > /dev/sdb'
+
+faster for big drives, no ssh, requires netcact-openbsd
+    # target
+    which firewall-cmd 2> /dev/null && firewall-cmd --add-port=7000/tcp
+    netcat -l 7000 | pv | zstd -dcf > /dev/sdb
+
+    # source
+    pv /dev/sdb | zstd -1 | netcat -N target.example.com 7000
+
 
 ### LVM
 
@@ -152,9 +166,16 @@ Re-compress MySQL partitions (inndob with DirectIO circumventing compression):
 Create compressed file system 
 
     mkfs.btrfs -L SRV /dev/vol1/srv
-    echo '/dev/mapper/bg0-srv /srv btrfs defaults,noatime,acl,nodev,nosuid,compress=zstd 0 0' >> /etc/fstab
+    echo '/dev/mapper/bg0-srv /srv btrfs defaults,noatime,nofail,acl,nodev,nosuid,compress=zstd:1 0 0' >> /etc/fstab
     mount /srv
 
+Troubleshooting "btrfs_replay_log:2288: errno=-22 unknown (Failed to recover log tree)"
+
+    btrfs check /dev/vdb
+    btrfs rescue zero-log /dev/vdb
+    btrfs scrub start /dev/vdb  # healthcheck
+    watch -n 10 btrfs scrub status /dev/vdb
+    
 
 Permissions
 -----------
@@ -170,4 +191,4 @@ via default acls
 
 Remove `executable` permissions from file (e.g. in webroot)
 
-    find /srv/tokenizer -type f -exec chmod a-x {} \;
+    find /srv/tokenizer -type f -exec chmod a-x {} +

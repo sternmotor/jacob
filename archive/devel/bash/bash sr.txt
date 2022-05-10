@@ -1351,7 +1351,7 @@ EOF
         dd bs=2048 if=/dev/hda1 of=/dev/hdb1
 
     # remove files older than 30 days
-        find -name "$1.bak*" -maxdepth 1 -atime +30 -exec rm -vf {} \;
+        find -name "$1.bak*" -maxdepth 1 -atime +30 -exec rm -vf {} +
     # display only
         find -type f -mount -atime +30 -print
 

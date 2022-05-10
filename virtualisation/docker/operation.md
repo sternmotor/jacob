@@ -56,6 +56,13 @@ Get current RAM/CPU/IOPS/Network usage
 
     docker stats 
 
+Container management
+--------------------
+
+Remove zombie containers
+
+    docker rm $(docker ps --filter "status=exited" -q)
+
 
 Monitoring
 ----------

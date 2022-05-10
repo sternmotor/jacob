@@ -1,6 +1,9 @@
 Bash data handling
 ==================
 
+
+
+
 Calculations
 ------------
 
@@ -12,6 +15,10 @@ Sum up all numbers in a text file
 
     awk '{ sum += $1 } END { print sum }' "$temp_dir/all_sizes_mb"
 
+
+Check if string is a integer - dows not work with floats
+
+    test [ ! -z "$number" ] && [ -z "${number//[0-9]/} ]
 
 Arrays
 ------

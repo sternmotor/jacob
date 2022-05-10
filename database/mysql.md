@@ -42,18 +42,29 @@ Reset root password
     mysqladmin shutdown
     systemctl start mariadb
 
-Drop all users with bad host specification
+Drop all users without password or non-local root accounts
 
-    mysql -Bse "select user,host from mysql.user WHERE user = 'nagios' AND  host != '%'" \
-    | while read u h; do 
-        echo "removing ${u}@$h"
-        mysql -e "DROP USER '${u}'@'$h'"
-    done
-    mysql -e "FLUSH PRIVILEGES"
+        mysql -e "
+            DELETE FROM mysql.user 
+                WHERE user='root' 
+                AND host NOT IN ('localhost', '127.0.0.1', '::1');
+            DELETE FROM mysql.user WHERE user='';
+            DELETE FROM mysql.user WHERE password='';
+            DROP DATABASE test;
+            FLUSH PRIVILEGES;
+        "
 
-Create monitoring user
+Change user password
 
     mysql -e "
+        UPDATE mysql.user SET Password=PASSWORD('xxxxx') 
+        WHERE user='jira' AND host='%'
+    "
+
+Create monitoring user, remove local accounts
+
+    mysql -e "
+    DELETE FROM mysql.user WHERE user = 'nagios' AND  host != '%';
     GRANT PROCESS,SHOW VIEW,REPLICATION CLIENT,SELECT,SHOW DATABASES ON *.* to nagios@'%' IDENTIFIED BY PASSWORD '*599FA96B9EF18A97585DE37CE9AA8B7CA751EAC7';
     FLUSH PRIVILEGES;
     "
@@ -186,6 +197,18 @@ Group mapping ldap-mariadb: [here][ldap]
 
 Replication
 -----------
+
+
+Purge binlogs while under replication
+
+* Slave: retrieve `Master_Log_File` binlog name
+
+        mysql -e "SHOW SLAVE STATUS\G"
+
+* Master: purge binary logs prior to `Master_Log_File`
+    
+        mysql -e "PURGE BINARY LOGS TO 'mysql-bin.000063'"
+
 
 ### Parameters
 

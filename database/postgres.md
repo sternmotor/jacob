@@ -9,6 +9,37 @@ Run command, strip output
 
     psql -U postgres -qAtXc 'SELECT 1'
 
+Config
+------
+
+Get postgres config settings
+
+    psql -U postgres -c "
+        SELECT name,setting,unit FROM pg_settings
+        WHERE name LIKE '%connection%'
+    "
+
+
+
+Set system config - check which context the settings is:
+
+    psql -U postgres -c "SELECT name,context FROM pg_settings ORDER BY context,name"
+
+According to context, do
+
+* "postmaster": edit postgresql.conf, restart server
+
+* "sighup", "backend", "superuser-backend": edit postgresql.conf, reload server by 
+    * sending `SIGHUP` to postgres "postmaster" process
+    * `pg_ctl reload` as user "postgres"
+    * `psql -U postgres -c 'SELECT pg_reload_conf()'`
+
+* "superuser", "user": system config in live instance:
+
+    psql -U postgres -c "ALTER SYSTEM SET work_mem='50MB'"
+
+
+
 
 
 Databases and user maintenance
@@ -94,14 +125,44 @@ Replication
 
 Check [repmgr]https://severalnines.com/database-blog/integrating-tools-manage-postgresql-production() tool which dows all the heavy lifting (STONITH, replication setup)
 
+
+Initiate replication: 
+
+* master: 
+
+        psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
+        REPLICATION_PASSWORD="$(
+            tr -dc '[:graph:]' < /dev/urandom | tr -d "'\"" | fold -w 24 | head -n 1
+        )" \
+        && psql -U postgres -c "
+            DROP ROLE IF EXISTS replicator;
+            CREATE ROLE replicator LOGIN REPLICATION ENCRYPTED PASSWORD '$REPLICATION_PASSWORD';
+            SELECT pg_create_physical_replication_slot('replicator');
+        " \
+        && echo "REPLICATION_PASSWORD='$REPLICATION_PASSWORD'" || echo "ERROR!"
+
+* slave: pull database - when asked, enter password from source server, here:
+
+        SOURCE_HOST=db01.example.com
+        DATA_DIR="$(psql -U postgres -Atc 'SHOW data_directory')" \
+        || DATA_DIR=/var/lib/postgresql/data
+        systemctl stop postgresql-12
+        # [ -z "${DATA_DIR:-}" ] || rm -rf "$DATA_DIR"/*
+        pg_basebackup -h $SOURCE_HOST -U replicator --slot replicator \
+        --checkpoint=fast -D "$DATA_DIR" -Fp -Xs -P -R
+        chown -R postgres:postgres "$DATA_DIR"
+        chmod 0700 "$DATA_DIR"
+        systemctl start postgresql-12
+
+
 Get replication state
 
 master:
 
     psql -U postgres -Axc "
         SELECT usename,application_name,client_addr,backend_start,state,sync_state 
-        FROM pg_stat_replication" \
-    | column -ts '|'
+        FROM pg_stat_replication" | column -ts '|'
+
 
 
 slave:
@@ -110,12 +171,77 @@ slave:
     | column -ts '|'
 
 
+DANGER: wrong approach, find latest checkpoint and see what is older
+https://www.postgresql.org/docs/current/continuous-archiving.html
+#Clear wal files: find current wal file, remove everything older (on master)
+#
+#    wal_file=$( psql -U postgres -Atc "SELECT pg_walfile_name(pg_current_wal_lsn())")
+#    data_dir="$(psql -U postgres -Atc 'SHOW data_directory')"
+#    find $data_dir/pg_wal -type f \
+#        ! -name "$wal_file" -name '[0-9]*' \
+#        ! -newer "$data_dir/pg_wal/$wal_file" 
+
+
+
+
+Start/stop slave replication
+
+    psql -U postgres -c 'SELECT pg_wal_replay_pause()'
+    psql -U postgres -c 'SELECT pg_wal_replay_resume()'
+
+
+Check replication health on slave, see [here][pg_repli_check]
+
+1. General checks
+
+```
+psql -U postgres -Axc '
+    SELECT pg_is_in_recovery(),pg_is_wal_replay_paused()
+'
+```
+
+2. Determine lag in case wal locations are out of sync
+
+```
+psql -U postgres -Axc '
+    SELECT CASE WHEN pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()
+    THEN 0
+    ELSE EXTRACT (EPOCH FROM now() - pg_last_xact_replay_timestamp())
+    END AS last_update_sec
+'
+```
+
+3. Show how much data is missing on slave
+
+```
+psql -U postgres -Axc '
+    SELECT round(
+        pg_wal_lsn_diff(
+            pg_last_wal_receive_lsn(),
+            pg_last_wal_replay_lsn()
+        )/1024/1024, 0
+    )
+    AS missing_lsn_mb
+'
+```
+
+Turn slave to master - move replication file out of the way
+
+    DATA_DIR="$(psql -U postgres -Atc 'SHOW data_directory')" 
+    rm -f $DATA_DIR/{standby.signal,backup_label.*,recovery.conf}
+
+
+[pg_repli_check]: https://severalnines.com/database-blog/what-look-if-your-postgresql-replication-lagging
+
 DB transfer
 -----------
 
 Pull data from source to target and enable replication, check out: https://www.postgresql.org/docs/10/app-pgbasebackup.html
 
 Source: install replication user on source server
+
+    #ERROR:  replication slot "rep_slot" is active for PID 162564
+    # select pg_terminate_backend(162564);
 
     psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
     REPLICATION_PASSWORD="$(
@@ -144,14 +270,16 @@ Source: enable `replication` user login to this server
 
 Target: pull database - when asked, enter password from source server, here:
 
-    REPLICATION_PASSWORD=xxx 
-    SOURCE_HOST=db11.app.xibe.rz1.xtrav.de
-    DATA_DIR=/var/lib/postgresql/data
+    SOURCE_HOST=db01.example.com
+    DATA_DIR="$(psql -U postgres -Atc 'SHOW data_directory')" \
+    || DATA_DIR=/var/lib/postgresql/data
+    systemctl stop postgresl-12
+    # [ -z "${DATA_DIR:-}" ] || rm -rf "$DATA_DIR"/*
     pg_basebackup -h $SOURCE_HOST -U replicator --slot replicator \
-    -D "$DATA_DIR" -Fp -Xs -P -R
-
-
+    --checkpoint=fast -D "$DATA_DIR" -Fp -Xs -P -R
     chown -R postgres:postgres "$DATA_DIR"
+    chmod 0700 "$DATA_DIR"
+    systemctl start postgresl-12
 
 
 
@@ -190,38 +318,12 @@ Check if replication ist running on system:
     DATA_DIR="$(psql -U postgres -Atc 'SHOW data_directory')"
     ls "$DATA_DIR/pg_wal" -ltr
 
-* slave: validate there is a line like `startup   recovering 000000010000003D00000087` and `walreceiver   streaming 3D/XXXXXXXX  ...`
+* slave: validate there are  lines like 
+  `startup   recovering 000000010000003D00000087` and 
+  `walreceiver   streaming 3D/XXXXXXXX  ...` in process list:
 
+      ps -aef | grep ^postgres
 
-
-Config
-------
-
-Get postgres config settings
-
-    psql -U postgres -c "
-        SELECT name,setting,unit FROM pg_settings
-        WHERE name LIKE '%connection%'
-    "
-
-Set system config in live instance (all databases)
-
-    psql -U postgres -c "
-        ALTER SYSTEM SET work_mem='50MB';
-        SELECT pg_reload_conf();
-    "
-
-
-Show which config settings may be changed by reload and which need server restart
-
-    SELECT name,context FROM pg_settings
-
-
-Reload config settings
-
-1. by sending `SIGHUP` to postgres "postmaster" process
-2. `pg_ctl reload` as user "postgres"
-3. `psql -U postgres -c 'SELECT pg_reload_conf()'`
 
 
 Plugins, Extensions, Modules

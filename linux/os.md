@@ -189,7 +189,7 @@ Show which processes use swap
             if(process["VmSwap"] && process["VmSwap"] != "0 kB") 
                 printf "%10s %-30s %20s\n",process["Pid"],process["Name"],process["VmSwap"]
         }' \
-    {} \;
+    {} +
 
 
 
@@ -295,6 +295,14 @@ Edit `/etc/logrotate.d/somelog` - needs `pigz` parallel compressor tool
         rotate 5
         size 64M
     }
+
+
+NTP
+---
+
+Update ntp time at dns server
+
+    ntpdate -u $(awk '/nameserver/{print $2}' /etc/resolv.conf)
 
 Resetting linux server identity
 -------------------------------

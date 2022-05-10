@@ -5,7 +5,7 @@ KVM virtual machine mangement
 VM status
 ---------
 
-    virsh list
+    virsh list --names
     virsh list --all
     virsh list --inactive
     virsh list --autostart
