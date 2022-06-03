@@ -1,7 +1,0 @@
-#!/bin/sh
-
-grep -i secu-ring * -R
-grep -i g.mann * -R
-grep -wi mann * -R
-grep -wi gunnar * -R
-grep -i fellow * -R

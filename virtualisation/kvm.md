@@ -18,11 +18,15 @@ Statistics
 
 List all vms
 
-    for i in $(virsh list --name --all); do echo $i; done
+    for vm in $(virsh list --name --all); do echo $vm; done
 
 List all blockdevices of vm
 
     virsh domblklist $VM | awk '/\/dev\//{print $2}'
+
+Set autostart for all vms
+
+    for vm in $(virsh list --name --all); do virsh autostart $vm; done
 
 
 CPU, Mem
@@ -125,8 +129,8 @@ Transfer vm config, start vm on target server
     TARGET=remote-server
     VM=some-vm
     virsh dumpxml $VM | pv | ssh $TARGET "cat - > /root/import-$VM.xml"
-    ssh $TARGET "virsh define /root/import-$VM.xml"
-    ssh $TARGET "virsh start $VM"
+    ssh -n $TARGET "virsh define /root/import-$VM.xml"
+    ssh -n $TARGET "virsh start $VM"
 
 
 Remove machine on source server after checking that everything is fine

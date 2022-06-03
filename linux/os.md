@@ -6,6 +6,16 @@ View kernel messages with readable timestamp
 
     dmesg -T
 
+Performance 
+-----------
+
+Show top 10 cpu consumers
+
+    ps auxf | (sed -u 1q; sort -nr -k 3) | head -11
+
+Show top 10 memory consumers
+
+    ps auxf | (sed -u 1q; sort -nr -k 4) | head -11
 
 SystemD
 -------

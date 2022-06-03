@@ -1,9 +1,0 @@
-# Scan a directory for viruses
-
-```
-yum install -y clamav clamav-unofficial-sigs.noarch
-freshclam
-clamav-unofficial-sigs.sh
-clamscan -r <dir> 
-```
-

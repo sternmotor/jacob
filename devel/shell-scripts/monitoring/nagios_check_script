@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-retrieve postgresql replication/recovery/slave status, check for lag
+Retrieve postgresql replication/recovery/slave status, check for lag
 """
 
 import argparse
@@ -15,24 +15,15 @@ EXIT_UNKN = 3
 
 DEFAULT_MAX_LAG = 1000
 
+
 # command line options and help
-parser = argparse.ArgumentParser(description=__doc__, add_help=False)
+parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument(
     "-c", "--critical", default = DEFAULT_MAX_LAG, type=int,
     help='Critical number of slave replication lag in seconds, '
     'default is {}'.format(DEFAULT_MAX_LAG)
 )
-parser.add_argument(
-    '-H', '--help', action='help', default=argparse.SUPPRESS,
-     help='Show this help message and exit.'
-)
-
-
 args = parser.parse_args() # (['-h'])
-
-if args.port and not ( args.port >= 1 and args.port <= 65535):
-    parser.error("Enter number between 1 and 65535 for port")
-
 
 
 # query status

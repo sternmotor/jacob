@@ -20,7 +20,6 @@ Get postgres config settings
     "
 
 
-
 Set system config - check which context the settings is:
 
     psql -U postgres -c "SELECT name,context FROM pg_settings ORDER BY context,name"
@@ -37,10 +36,6 @@ According to context, do
 * "superuser", "user": system config in live instance:
 
     psql -U postgres -c "ALTER SYSTEM SET work_mem='50MB'"
-
-
-
-
 
 Databases and user maintenance
 ---------------------------------
@@ -132,7 +127,7 @@ Initiate replication:
 
         psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
         REPLICATION_PASSWORD="$(
-            tr -dc '[:graph:]' < /dev/urandom | tr -d "'\"" | fold -w 24 | head -n 1
+            tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1
         )" \
         && psql -U postgres -c "
             DROP ROLE IF EXISTS replicator;
@@ -157,13 +152,23 @@ Initiate replication:
 
 Get replication state
 
-master:
+master overview:
 
     psql -U postgres -Axc "
-        SELECT usename,application_name,client_addr,backend_start,state,sync_state 
-        FROM pg_stat_replication" | column -ts '|'
+        SELECT usename,application_name,client_addr,backend_start,state,sync_state,replay_lag 
+        FROM pg_stat_replication
+    " 
 
+master: get wal files currently used by slave replication slots
 
+    psql -U postgres -c "
+        SELECT slot_name,
+           lpad((pg_control_checkpoint()).timeline_id::text, 8, '0') ||
+           lpad(split_part(restart_lsn::text, '/', 1), 8, '0') ||
+           lpad(substr(split_part(restart_lsn::text, '/', 2), 1, 2), 8, '0')
+           AS wal_file
+        FROM pg_replication_slots;
+    "
 
 slave:
 
@@ -171,17 +176,14 @@ slave:
     | column -ts '|'
 
 
-DANGER: wrong approach, find latest checkpoint and see what is older
-https://www.postgresql.org/docs/current/continuous-archiving.html
-#Clear wal files: find current wal file, remove everything older (on master)
-#
-#    wal_file=$( psql -U postgres -Atc "SELECT pg_walfile_name(pg_current_wal_lsn())")
-#    data_dir="$(psql -U postgres -Atc 'SHOW data_directory')"
-#    find $data_dir/pg_wal -type f \
-#        ! -name "$wal_file" -name '[0-9]*' \
-#        ! -newer "$data_dir/pg_wal/$wal_file" 
+slave: age of last synced data entry from master (not exactly lag) in seconds
+
+    SELECT (EXTRACT(EPOCH FROM now()) - EXTRACT(EPOCH FROM pg_last_xact_replay_timestamp()))::int
 
 
+slave: age of last synced data entry from master (not exactly lag) in HH:MM:SS
+
+    SELECT now()::timestamp(0) - pg_last_xact_replay_timestamp()::timestamp(0)
 
 
 Start/stop slave replication
@@ -245,7 +247,7 @@ Source: install replication user on source server
 
     psql -U postgres -c "SELECT pg_drop_replication_slot('replicator')"
     REPLICATION_PASSWORD="$(
-        tr -dc '[:graph:]' < /dev/urandom | tr -d "'\"" | fold -w 24 | head -n 1
+        tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1
     )" \
     && psql -U postgres -c "
         DROP ROLE IF EXISTS replicator;
@@ -369,12 +371,24 @@ Performance testing
     pgbench -c 10 -S -T 600 -P 1 p gbench
 
 
-Number of connections:
+Number of connections
 
     psql -U postgres -c "select count(*) from pg_stat_activity"
 
+Show connections    
 
-Check maximum number of open files allowed for postrgesql service user:
+    psql -U postgres -c '
+        SELECT
+            usename,
+            client_addr,
+            backend_start,
+            now() - pg_stat_activity.query_start AS duration,
+            state
+        FROM pg_stat_activity
+        ORDER BY backend_start
+    '
+
+Check maximum number of open files allowed for postgresql service user:
 
     su - postgres -s /bin/sh -c "ulimit -n"
 

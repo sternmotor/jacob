@@ -92,7 +92,9 @@ Expand last partition to maximum available space
     yum install -y cloud-utils-growpart
     growpart /dev/sdb 4
 
+Re-read partition table
 
+    blockdev --rereadpt /dev/sdX
 
 GPT Partitionen
 ----------------
@@ -150,6 +152,28 @@ Shrink file system on partitionless lvm to 50GB
 BTRFS Filesystem
 ----------------
 
+Maintenance
+
+    sudo btrfs filesystem balance /srv
+    sudo btrfs filesystem defrag -c /srv
+
+    # Wenn falsche FS Belegung angezeigt wird (100% full):    
+    btrfs balance --full-balance /srv/
+
+Show subvolumes
+
+    sudo sync
+    sudo btrfs subvolume list /srv
+    echo -e "subvol\tqgroup\ttotal\tunshared"
+    while read g r e; do
+        group=${g##*/}
+        name="${volName[group]:--}"
+        echo $name $g \
+             $(numfmt --to=iec --round=nearest $r) \
+             $(numfmt --to=iec --round=nearest $e)
+    done < <(sudo btrfs qgroup show --raw /srv | tail -n+3) | column -t
+    
+
 Expand partition or raw disk's file system to maximum available space
 
     sudo btrfs filesystem resize max /dev/some-disk
@@ -192,3 +216,36 @@ via default acls
 Remove `executable` permissions from file (e.g. in webroot)
 
     find /srv/tokenizer -type f -exec chmod a-x {} +
+
+Speed test
+----------
+Primary tests:
+
+1. throughput/bandwitdh [MB/sec]: large, sequential r/w measurement
+2. latency [ms]: seek time for mechanical disks
+3. IOPS [1]: number of random read/write disk operations can be serviced, 
+   tested at 4K block size  usually
+
+Easy Peasy -make sure to provide 2xRAM free disk space for testing
+
+    curl -o gobonniego -L https://github.com/cunnie/gobonniego/releases/download/1.0.9/gobonniego-linux-amd64
+    chmod +x gobonniego
+    ./gobonniego -dir /mnt/ -size 10
+
+
+FIO
+
+Split read and write test, Direct IO (no system buffers), 4K/1MB blocksize:
+
+    lvcreate -L 10G vol1 -n fiotest
+
+    TIME=60
+    FS=/dev/vol1/fiotest
+    PARALLEL=3
+    for bs in 4k 1m; do
+        for rw in read write; do
+            fio --rw=$rw --name="$rw $bs $FS" --bs=$bs --direct=1 \
+            --filename=$FS --numjobs=$PARALLEL --ioengine=libaio --iodepth=32 \
+            --refill_buffers --group_reporting --runtime=$TIME --time_based
+        done
+    done

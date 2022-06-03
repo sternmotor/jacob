@@ -1,0 +1,91 @@
+#!/usr/bin/env python2
+"""
+Pull current value of 'max_connections' from database, check percentage of used
+connections
+"""
+
+import MySQLdb
+import argparse
+import sys
+
+EXIT_PASS = 0
+EXIT_WARN = 1
+EXIT_CRIT = 2
+EXIT_UNKN = 3
+
+DEFAULT_MAX_MAXCONNECTION_RATIO = 90    
+
+# command line options and help
+parser = argparse.ArgumentParser(description=__doc__, add_help=False)
+parser.add_argument(
+     '-c', '--critical', default = DEFAULT_MAX_MAXCONNECTION_RATIO, type=int,
+     help='Maximum allowed usage of max_connections (percentage, '
+     'default is {})'.format(DEFAULT_MAX_MAXCONNECTION_RATIO)
+)
+parser.add_argument(
+     '-h', '--host', default=None, required=False,
+     help='Hostname to connect to, leave empty for local connection'
+)
+parser.add_argument(
+     '-P', '--port',  type=int,  required=False,
+     help='Mysql network port to use, optional'
+)
+parser.add_argument(
+     '-u', '--user', default=None, required=False,
+     help='Mysql user for connection, optional'
+)
+parser.add_argument(
+     '-p', '--pass', default=None, required=False, dest='passwd',
+     help='Mysql user password for connection, optional'
+)
+parser.add_argument(
+    '-H', '--help', action='help', default=argparse.SUPPRESS,
+     help='Show this help message and exit.'
+)
+
+args = parser.parse_args() # (['-h'])
+
+if args.port and not ( args.port >= 1 and args.port <= 65535):
+    parser.error("Enter number between 1 and 65535 for port")
+
+# store monitoring boundary
+critical_ratio = args.__dict__.pop('critical')
+
+# remove unset parameters from 
+for param in ('host', 'user', 'passwd', 'port'):
+    if not args.__dict__[param]:
+        args.__dict__.pop(param)
+
+
+# https://mysqlclient.readthedocs.io/user_guide.html#:~:text=MySQLdb%20is%20a%20thin%20Python,for%20the%20sake%20of%20efficiency.
+conn = MySQLdb.connect(**args.__dict__)
+cursor = conn.cursor()
+
+# number of maximum connections allowed
+cursor.execute("""SHOW VARIABLES LIKE 'max_connections'""")
+max_connections = int(cursor.fetchone()[1])
+
+# number of currently running connections
+cursor.execute('''SHOW PROCESSLIST''')
+current_connections = len(cursor.fetchall())
+
+conn.close()
+
+
+# analyse
+
+if current_connections == 1:
+    print('No active DB connection found')
+    sys.exit(EXIT_WARN)
+
+else:
+    print('{} active DB connections (limit {})'.format(current_connections, max_connections))
+    if current_connections > int(critical_ratio / 100.0 * max_connections):
+        sys.exit(EXIT_CRIT)
+
+    else:
+        sys.exit(EXIT_PASS)
+
+
+# GMA 2022
+# vim: ts=4:sw=4:ft=python:et

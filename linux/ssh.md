@@ -1,3 +1,6 @@
+# SSH usage
+
+## Authentification
 
 Quickly allow ssh root loging
 
@@ -16,6 +19,16 @@ Pull remote ssh host key
     TARGET=some-host.example.com
     grep -wq "$TARGET" ~/.ssh/known_hosts || ssh-keyscan $TARGET >> ~/.ssh/known_hosts
 
+
+Hand over password from variable
+
+    sshpass -p "$PASSWORD" ssh user@host
+
+
+
+
+## Bastion host
+    
 Bastion host config
 
     ...
@@ -41,8 +54,31 @@ Bastion host usage
 
     ssh -o ProxyCommand="ssh -W %h:%p -p 22 bastion.example.com" server1 
 
-traffic tunnel, socks proxy (set the SOCKS4/5 proxy to localhost:3333. Check
+
+## Tunneling
+
+Make remote ssh server accessible on localhost via relay server
+
+    ssh user@relay-server.com -L 2222:remote-server.com:22
+    autossh -NnT -M 0 user@relay-server.com -L 2222:remote-server.com:22
+
+
+Socks proxy (SOCKS4/5 proxy at localhost:3333). Check
 whether it's working by surfing e.g. to checkip.dyndns.org)
 
     ssh -ND 3333 username@external.machine
 
+## Persistent connections
+
+Persistent, fast reusable connections on command line
+
+    mkdir ~/.ssh
+    ssh -o ControlMaster=auto -o ControlPersist=10m -o ControlPath=~/.ssh/sockets-%r@%h:%p <COMMAND>
+
+
+Persistent, fast reusable connections via `~/.ssh/config`:
+
+    Host *
+        ControlMaster auto
+        ControlPath ~/.ssh/sockets-%r@%h-%p
+        ControlPersist 10m

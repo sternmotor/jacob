@@ -19,6 +19,14 @@ General settings: logging, buildkit, selinux - edit `/etc/docker/daemon.json`
         }
     }
 
+
+Execute commands in container
+-----------------------------
+
+NOT tested: e.g. if the container doesn't have ip commands in it
+
+    nsenter -n -t $(docker inspect --format {{.State.Pid}} $dockername) ip route add something.
+
 Ressources
 ----------
 

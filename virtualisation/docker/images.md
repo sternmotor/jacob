@@ -126,6 +126,11 @@ Install gosu
      && chmod 755 /usr/bin/gosu \
      && gosu nobody true
 
+Retrieve latest version from github tags
+
+    curl -sX GET "https://api.github.com/repos/WireGuard/wireguard-tools/tags" \
+    | jq -r .[0].name
+
 
 
 Dockerignore

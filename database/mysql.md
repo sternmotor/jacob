@@ -23,36 +23,58 @@ Retrieve config options in shell
 Users
 -----
 
-Create user with full access to db
+Create user with full access to db `seafile_db`
 
     CREATE USER 'seafile'@'%' IDENTIFIED BY 'xxxxx';
-    GRANT ALL PRIVILEGES ON mysql_seafile.* TO 'seafile'@'%';
+    GRANT ALL PRIVILEGES O seafile_db.* TO 'seafile'@'%';
     FLUSH PRIVILEGES;
 
+
+Create root user with full access to all dbs 
     CREATE USER 'root'@'%' IDENTIFIED BY 'xxxxx';
     GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
     FLUSH PRIVILEGES;
 
-Reset root password
+Update new root password, drop bad users for running mysql
 
-    systemctl stop mariadb
+    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1)
+    mysql -e "
+        UPDATE mysql.user SET password=PASSWORD('$PW') WHERE user='root';
+        DELETE FROM mysql.user WHERE user='root' AND host NOT IN ('localhost', '127.0.0.1', '::1');
+        DELETE FROM mysql.user WHERE user='';
+        DELETE FROM mysql.user WHERE password='';
+        DROP DATABASE IF EXISTS test;
+        DELETE FROM mysql.db WHERE db='test' OR db='test\\_%';
+        FLUSH PRIVILEGES;
+    "
+    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf
+
+Reset root password when login is not possible
+
+    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1) 
+    mysqladmin shutdown
     mysqld_safe --skip-grant-tables &
-    mysql -e "UPDATE mysql.user SET Password=PASSWORD('new-password') WHERE User='root'"
-    mysql -e "FLUSH PRIVILEGES"
+    while ! mysqladmin ping > /dev/null 2>&1 ; do sleep 1; done
+    mysql -e "
+        UPDATE mysql.user SET Password=PASSWORD('$PW') WHERE user='root';
+        FLUSH PRIVILEGES;
+    "
+    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf 
     mysqladmin shutdown
     systemctl start mariadb
 
+
 Drop all users without password or non-local root accounts
 
-        mysql -e "
-            DELETE FROM mysql.user 
-                WHERE user='root' 
-                AND host NOT IN ('localhost', '127.0.0.1', '::1');
-            DELETE FROM mysql.user WHERE user='';
-            DELETE FROM mysql.user WHERE password='';
-            DROP DATABASE test;
-            FLUSH PRIVILEGES;
-        "
+    mysql -e "
+        DELETE FROM mysql.user 
+            WHERE user='root' 
+            AND host NOT IN ('localhost', '127.0.0.1', '::1');
+        DELETE FROM mysql.user WHERE user='';
+        DELETE FROM mysql.user WHERE password='';
+        DROP DATABASE test;
+        FLUSH PRIVILEGES;
+    "
 
 Change user password
 
