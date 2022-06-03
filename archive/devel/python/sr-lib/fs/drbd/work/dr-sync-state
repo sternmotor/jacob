@@ -1,1 +1,0 @@
-grep SyncTarget /proc/drbd -A 5

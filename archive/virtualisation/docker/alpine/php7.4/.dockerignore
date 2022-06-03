@@ -1,2 +1,0 @@
-# exclude Dockerfile when running COPY . / in Dockerfile
-Dockerfile
