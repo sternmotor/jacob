@@ -1,5 +1,0 @@
-sudo apt-get install gnome-panel
-mkdir -p "$HOME/.local/share/applications"
-gnome-desktop-item-edit "$HOME/.local/share/applications"  --create-new
-
-icopn zuweisen, pfad ohne "$HOME"

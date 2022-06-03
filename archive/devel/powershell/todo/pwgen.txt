@@ -1,7 +1,0 @@
-function Create-Key ([int]$Length=128, [float]$SpecialsRatio=0.2){
-
-    Add-Type -AssemblyName System.Web
-    # Specials = number of non-aplphanumeric characters, here one third
-    $Specials = [int] $Length * $SpecialsRatio
-    [System.Web.Security.Membership]::GeneratePassword($Length,$Specials)
-}
