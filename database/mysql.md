@@ -1,6 +1,10 @@
 MySQL Administration and Usage
 =============================
 
+Check out: [Percona Toolkit][pttools]
+
+[pttools]: https://www.percona.com/doc/percona-toolkit/LATEST/index.html
+
 Config
 ------
 
@@ -35,21 +39,18 @@ Create root user with full access to all dbs
     GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
     FLUSH PRIVILEGES;
 
-Update new root password, drop bad users for running mysql
+
+Update new root password
 
     PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1)
     mysql -e "
         UPDATE mysql.user SET password=PASSWORD('$PW') WHERE user='root';
-        DELETE FROM mysql.user WHERE user='root' AND host NOT IN ('localhost', '127.0.0.1', '::1');
-        DELETE FROM mysql.user WHERE user='';
-        DELETE FROM mysql.user WHERE password='';
-        DROP DATABASE IF EXISTS test;
-        DELETE FROM mysql.db WHERE db='test' OR db='test\\_%';
         FLUSH PRIVILEGES;
     "
     echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf
 
-Reset root password when login is not possible
+
+Reset root password when login is not possible - db is beeing shut down
 
     PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1) 
     mysqladmin shutdown
@@ -64,7 +65,7 @@ Reset root password when login is not possible
     systemctl start mariadb
 
 
-Drop all users without password or non-local root accounts
+Drop test db, all users without password or non-local root accounts
 
     mysql -e "
         DELETE FROM mysql.user 
@@ -72,8 +73,8 @@ Drop all users without password or non-local root accounts
             AND host NOT IN ('localhost', '127.0.0.1', '::1');
         DELETE FROM mysql.user WHERE user='';
         DELETE FROM mysql.user WHERE password='';
-        DROP DATABASE test;
-        FLUSH PRIVILEGES;
+        DROP DATABASE IF EXISTS test;
+        DELETE FROM mysql.db WHERE db='test' OR db='test\\_%';
     "
 
 Change user password
@@ -96,6 +97,8 @@ Create monitoring user, remove local accounts
 
 Profiling, performance
 ----------------------
+
+MariaDB memory allocation: [Official documentation](https://mariadb.com/kb/en/mariadb-memory-allocation)
 
 
 mytop -dmysql
