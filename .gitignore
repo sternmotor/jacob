@@ -26,4 +26,14 @@ RECYCLER
 System\ Volume\ Information
 Thumbs.db
 trash
+wow.md
 
+# running git repository in home dir
+.bash_logout
+.bashrc
+.profile
+.ssh
+.vim
+.viminfo
+.gitconfig
+.bash_history
