@@ -379,8 +379,49 @@ Requirements for master-slave replication
         | grep -wE '(Last_SQL_Error|Seconds_Behind_Master|Slave_IO_Running|Slave_SQL_Running)'"
 
 
-Backup
-------
+Dump, backup
+------------
+
+
+Standard dump - all databases. Prepare rebuilding replication from this dump
+
+    mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
+    --single-transaction --all-databases | pigz -c > full_dump.sql.gz
+
+    
+
+Dump with progress meter - estimate max db size from db file size, depending on
+db fragmentation the estimation may be too large
+
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir') \ 
+    && DB_SIZE=$(
+        find "$MYSQL_DIR" -type f -printf "%s %p\n" \
+        | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {print s}'
+    ) \
+    && mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
+    --single-transaction --all-databases  \
+    | pv -s $DB_SIZE | pigz -c > /var/backups/xxfull_dump.sql.gz
+
+
+Dump specific databases, only - filter by mysql filter expressions
+
+    # EXCLUDE patterns override INCLUDE patterns
+    INCLUDE='%'
+    EXCLUDE='%xerces% %ota% mysql information_schema performance_schema'
+
+    include_expr="table_schema LIKE \"${INCLUDE// /\" OR table_schema LIKE \"}\""
+    exclude_expr="table_schema LIKE \"${EXCLUDE// /\" OR table_schema LIKE \"}\""
+    DUMP_DATABASES=$( mysql -Bse "
+        SELECT DISTINCT table_schema AS db
+        FROM information_schema.tables
+        WHERE ($include_expr) AND NOT ($exclude_expr)
+        GROUP BY table_schema
+    ")
+
+    mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
+    --single-transaction --databases $DUMP_DATABASES | pigz -c > selected_dbs.sql.gz
+
+
 
 Create local copy of mysql data dir (consistently, without locking running database) - requires [percona xtrabackup](https://www.percona.com/doc/percona-xtrabackup/2.3/backup_scenarios/full_backup.html#preparing-a-backup) package to  be installed.
 

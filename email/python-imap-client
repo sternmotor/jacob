@@ -1,4 +1,7 @@
 
+python imaplib:
+
+    * check http://www.faqs.org/rfcs/rfc3501.html for SEARCH syntax
 
 Receive mails from imap accounts
 
@@ -25,4 +28,14 @@ Receive mails from imap accounts
 
     imap_conn.close()
     imap_conn.logout()
+
+
+Filter by mail age and "TO" field:
+
+    sent_since_dt = datetime.datetime.now() - datetime.timedelta(minutes=60)
+    result, message_ids = imap_conn.search(
+            None, 
+            'TO receiver@example.com', 
+            f'(SENTSINCE {sent_since_dt.strftime("%d-%b-%Y")})'
+    )
 

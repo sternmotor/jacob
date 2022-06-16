@@ -16,7 +16,15 @@ Compare two files - show differences in two columns
     sdiff -Ws fileA fileB
 
 
-Sed
+find
+----
+
+Use find to display file size of filtered entries, check `man find`, `printf`
+
+    find "$MYSQL_DIR" -type f -printf "%s %p\n"
+
+
+sed
 ---
 
 Commands used like `sed -n -r -e '2,/^\s*$/p' PATH`
