@@ -1,6 +1,11 @@
 Task planning
 =============
 
+Online systems
+-----------
+
+* [ToDoIst](https://todoist.com/de) (recommended)
+
 Bullet journal
 -------------
 

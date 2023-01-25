@@ -20,6 +20,11 @@ Show top 10 memory consumers
 SystemD
 -------
 
+Find and start failed job
+
+    systemctl list-units | grep -i failed
+    systemctl start carbon-cache
+
 ### System control
 
 
@@ -380,10 +385,48 @@ Bootstrapping Debian: see [ReduceDebian](https://wiki.debian.org/ReduceDebian)
 
 LiveCD, Live USB, best by far: https://willhaley.com/blog/custom-debian-live-environment/
 
+## UDEV
+
+
+Implement trigger on usb events, for example watch usb harddrive plugin/removal
+
+* get vendor and bus id from `lsusb` or via watching `udevadm monitor --env`:
+
+```
+Bus 004 Device 002: ID 174c:1351 ASMedia Technology Inc.
+```
+
+* edit `/etc/udev/rules.d/85-usb-connect.rules`
+
+```
+# Rules for plugging in and out ASMedia USB device (harddisk)
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="174c", ATTRS{idProduct}=="1351", RUN+="/usr/local/bin/usb-connect-udevstarter"
+ACTION=="remove", ENV{ID_VENDOR_ID}=="174c", ENV{ID_MODEL_ID}=="1351", RUN+="/usr/local/bin/usb-disconnect-udevstarter"
+```
+
+* restart udev
+
+```
+udevadm control --reload-rules
+```
+
+
+* debug  udev trigger events
+```
+udevadm trigger --action="add" -a "idVendor=174c" -a "idProduct=1351"
+udevadm trigger --action="remove" -p "ID_VENDOR_ID=174c" -p "ID_MODEL_ID=1351"
+```
+
+
+Automatic zram device creation and mount when module is loaded. Alternatively, use a systemd unit here
+
+* edit `/etc/udev/rules.d/99-zram.rules`
+
+    KERNEL=="zram0",  ATTR{comp_algorithm}="zstd",  ATTR{disksize}="20G",  RUN+="/usr/sbin/mkfs.xfs /dev/zram0", RUN+="/usr/bin/mount /dev/zram0 /tmp", RUN+="/usr/bin/chmod 1777 /tmp", TAG+="systemd"
+
+
 Troubleshooting
 ---------------
-
-
 
 kernel:NMI watchdog: BUG: soft lockup - CPU#1 stuck for 44s! 
     * read [this blog entry](https://blog.seibert-media.net/blog/2017/10/05/it-tagebuch-linux-was-sind-cpu-lockups/) - in short:
@@ -391,3 +434,4 @@ kernel:NMI watchdog: BUG: soft lockup - CPU#1 stuck for 44s!
 	* reasons: high load or very high levels of cpu time overcommit
     * this is clearly a kernel process hangup (no process in user space can cause a soft lockup)
     * try updating kernel, play with cpu overcommit on virtualized systems and watch load
+

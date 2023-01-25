@@ -16,4 +16,28 @@ Help text: write as script header, grep out for help display
 
     grep "^#:" "$0" | cut -d ' ' -f2- 1>&2
 
+Wait for single key press
 
+    read -p "Press any key to continue or CTRL-C to break ..." -n1 -s
+
+
+Query password securely
+
+    echo -n 'Enter user password: '
+    prompt=''
+    while IFS= read -p "$prompt" -r -s -n 1 char
+    do
+        # enter - accept password
+        if [[ $char == $'\0' ]] ; then
+            break
+        fi
+        # eackspace
+        if [[ $char == $'\177' ]] ; then
+            prompt=$'\b \b'
+            password="${AdminPassword%?}"
+        else
+            prompt='*'
+            password+="$char"
+        fi
+    done
+    echo

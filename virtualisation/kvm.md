@@ -111,6 +111,8 @@ Transfer block devices
 
     VM=some-vm
     TARGET=remote-server
+    virsh shutdown $VM
+    while virsh list --name | grep -q $VM; do echo -n '.'; sleep 1; done; echo
     virsh domblklist $VM | awk '/\/dev\//{print $2}' \
     | while read DEV; do
         echo "Transferring block device $DEV"	
@@ -137,9 +139,7 @@ Remove machine on source server after checking that everything is fine
 
     VM=some-vm
     virsh destroy $VM
-    lvremove -y $(virsh domblklist $VM | awk '/\/dev\//{print $2}')
-    virsh undefine $VM
-
+    virsh undefine $VM --remove-all-storage --delete-snapshots
 
 
 Disable kvm host swapping when vm mem is low

@@ -10,7 +10,8 @@ Quickly allow ssh root loging
 
 Generate ssh key pair:
 
-    [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C $(whoami)@$(hostname -f)
+    [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -a 256 -N '' -f ~/.ssh/id_ed25519 \
+    -C $(whoami)@$(hostname -f)_$(date +%Y-%m-%d)
     cat  ~/.ssh/id_ed25519.pub
 
 
@@ -25,6 +26,58 @@ Hand over password from variable
     sshpass -p "$PASSWORD" ssh user@host
 
 
+## sFTP
+
+Run sftp server on port 22222, normal ssh on port 22, allow access for group "sftp" to sftp, only. Deny non-sftp members on sftp port (`/etc/ssh/sshd_config`):
+
+    Port 22222
+    Protocol 2
+    ...
+    SubSystem sftp internal-sftp
+
+    # exclude sftp groups from ssh access
+    match group sftp localport 22
+        ForceCommand /bin/echo "This account is restricted to sFTP access"
+
+    # exclude ssh logins from sftp
+    match group *,!sftp localport 22222
+        ForceCommand /bin/echo "This connection is reserved for sFTP access"
+
+    # allow sftp for sftp groups
+    match group sftp localport 22222
+        AllowTcpForwarding no
+        Banner none
+        ChrootDirectory /var/lib/sftp/%u
+        ForceCommand internal-sftp
+        PermitRootLogin no
+        X11Forwarding no
+
+Prepare users and chroot dirs
+
+    groupadd sftp
+    # add users as members of group sftp 
+    install -o root -g root -m 0750 -d /var/lib/sftp
+    install -o root -g root -m 0755 -d /var/lib/sftp/user1
+    install -o root -g root -m 0755 -d /var/lib/sftp/user2
+
+Prepare bind mounts of local source directories into chroot
+
+    mkdir /var/lib/sftp/user1/dir1
+    mkdir /var/lib/sftp/user1/dir2
+    mkdir /var/lib/sftp/user2/dir1
+
+Prepare fstab entries
+
+    /srv/dir1 /var/lib/sftp/user1/dir1 none bind 0 0
+    /srv/dir1 /var/lib/sftp/user2/dir1 none bind 0 0
+    /srv/dir2 /var/lib/sftp/user1/dir2 none bind 0 0
+
+Enbale mountts
+
+    mount -a
+    
+
+Now login as user "user1" or "users" via sFTP client on port 22222, this should allow access to "dir1" and "dir2" and nothing else.
 
 
 ## Bastion host
@@ -56,6 +109,24 @@ Bastion host usage
 
 
 ## Tunneling
+
+Configure transparent jumps over multiple hosts in `~/.ssh/config` where only host "jump" is directly reachable. This works transparently with git and scp. As example, remote (host "target") Port 443 is forwarded to local machine port 4443.
+
+    Host target
+      ProxyCommand ssh deepest_jump -W %h:%p
+      LocalForward 4443 localhost:443
+      User username3
+
+    Host deepest_jump
+      User username2
+      ProxyCommand ssh deep_jump -W %h:%p
+
+    Host deep_jump
+      User username1
+      ProxyCommand ssh jump -W %h:%p
+
+    Host jump
+      Port 30000
 
 Make remote ssh server accessible on localhost via relay server
 

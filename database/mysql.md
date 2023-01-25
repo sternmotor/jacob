@@ -16,448 +16,50 @@ Static and dynamic options
     SET GLOBAL max_connections = 1000;
 
 
-Retrieve config options in shell
+Retrieve config named option in shell
 
-    mysqld --verbose --help --log-bin-index="$(mktemp -u)" 2>/dev/null \
-    | awk '/^datadir/{print $2}'
+    mysql -Bse "SELECT @@<option>"
 
+Retrieve all config variables
 
-
-
-Users
------
-
-Create user with full access to db `seafile_db`
-
-    CREATE USER 'seafile'@'%' IDENTIFIED BY 'xxxxx';
-    GRANT ALL PRIVILEGES O seafile_db.* TO 'seafile'@'%';
-    FLUSH PRIVILEGES;
+    mysql -Bse "SHOW VARIABLES"
 
 
-Create root user with full access to all dbs 
-    CREATE USER 'root'@'%' IDENTIFIED BY 'xxxxx';
-    GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
-    FLUSH PRIVILEGES;
+Initialize DB
+-------------
 
+Stop and remove old DB
 
-Update new root password
+    MYSQL_DIR="$(mysql -Bse "SELECT @@datadir" 2>/dev/null )" \
+        || MYSQL_DIR=/var/lib/mysql
+    mysqladmin ping && mysqladmin shutdown
+    [ -z "${MYSQL_DIR}" ] || rm -rvf "$MYSQL_DIR"
 
-    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1)
-    mysql -e "
-        UPDATE mysql.user SET password=PASSWORD('$PW') WHERE user='root';
-        FLUSH PRIVILEGES;
-    "
-    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf
+Populate mysql
 
+    install -o mysql -g mysql -d "$MYSQL_DIR"/{,tmp,binlog} /var/{log,lib}/mysql
+    mysql_install_db
+    chown -R mysql:mysql "$MYSQL_DIR" /var/{log,lib}/mysql
 
-Reset root password when login is not possible - db is beeing shut down
+Set root password, clear user and test DB - see below
 
-    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1) 
-    mysqladmin shutdown
-    mysqld_safe --skip-grant-tables &
-    while ! mysqladmin ping > /dev/null 2>&1 ; do sleep 1; done
-    mysql -e "
-        UPDATE mysql.user SET Password=PASSWORD('$PW') WHERE user='root';
-        FLUSH PRIVILEGES;
-    "
-    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf 
-    mysqladmin shutdown
+Start MySQL service
+
+    systemctl enable mariadb
     systemctl start mariadb
 
 
-Drop test db, all users without password or non-local root accounts
 
-    mysql -e "
-        DELETE FROM mysql.user 
-            WHERE user='root' 
-            AND host NOT IN ('localhost', '127.0.0.1', '::1');
-        DELETE FROM mysql.user WHERE user='';
-        DELETE FROM mysql.user WHERE password='';
-        DROP DATABASE IF EXISTS test;
-        DELETE FROM mysql.db WHERE db='test' OR db='test\\_%';
-    "
+Data queries
+---------------------
 
-Change user password
 
-    mysql -e "
-        UPDATE mysql.user SET Password=PASSWORD('xxxxx') 
-        WHERE user='jira' AND host='%'
-    "
+Select databases
 
-Create monitoring user, remove local accounts
-
-    mysql -e "
-    DELETE FROM mysql.user WHERE user = 'nagios' AND  host != '%';
-    GRANT PROCESS,SHOW VIEW,REPLICATION CLIENT,SELECT,SHOW DATABASES ON *.* to nagios@'%' IDENTIFIED BY PASSWORD '*599FA96B9EF18A97585DE37CE9AA8B7CA751EAC7';
-    FLUSH PRIVILEGES;
-    "
-
-
-
-
-Profiling, performance
-----------------------
-
-MariaDB memory allocation: [Official documentation](https://mariadb.com/kb/en/mariadb-memory-allocation)
-
-
-mytop -dmysql
-
-* replication slave: 
-    * "Waiting for work from SQL thread", "Not enough room": check `slave_parallel_max_queued`
-    * row based binlog writing at master helps
-
-
-
-
-Target: make all indexes fit into memory
-
-innodb-buffer-pool-size = 0.8 * (All RAM - 2GB System - 20MB * max_connections)
-
-
-Queries and processes
-
-    > SHOW FULL PROCESSLIST
-
-or
-
-    mytop -dmysql
-
-
-Validate memory overcommit - find out reserved memory, compare against
-available mem
-
-    top -n1 | awk '/mysqld/{print $5}'
-    free -g
-
-
-Single database size in MB
-    mysql -Bse "
-    SELECT SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024))
-    FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_SCHEMA = "<DATABASE>"
-    "
-
-All databases sizes in MB 
-
-    mysql -e '
-    SELECT table_schema AS "Database", 
-    SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024)) 
-    AS "Size [MB]"
-    FROM INFORMATION_SCHEMA.TABLES
-    GROUP BY table_schema
-    '
-
-Single table size in MB
-    db=
-    tb=
-    mysql -Bse "
-    SELECT table_name AS 'Table',
-    round(((data_length + index_length) / 1024 / 1024)) 'Size in MB'
-    FROM information_schema.TABLES
-    WHERE table_schema = '$db'
-    AND table_name = '$tb'
-    "
-
-
-
-
-
-
-Check tables with no primary key: may slow down replication
-
-    mysql -e "
-    SELECT tables.table_schema, 
-           tables.table_name, 
-           tables.table_rows 
-    FROM   information_schema.tables 
-           LEFT JOIN (SELECT table_schema, 
-                             table_name 
-                      FROM   information_schema.statistics 
-                      GROUP  BY table_schema, 
-                                table_name, 
-                                index_name 
-                      HAVING Sum(CASE 
-                                   WHEN non_unique = 0 
-                                        AND nullable != 'YES' THEN 1 
-                                   ELSE 0 
-                                 end) = Count(*)) puks 
-                  ON tables.table_schema = puks.table_schema 
-                     AND tables.table_name = puks.table_name 
-    WHERE  puks.table_name IS NULL 
-           AND tables.table_schema NOT IN ( 'mysql', 'information_schema', 
-                                            'performance_schema' 
-                                            , 'sys' ) 
-           AND tables.table_type = 'BASE TABLE' 
-           AND engine = 'InnoDB';
-    "
-
-
-Memory per connection - multiply by `max_connections`, most important
-is `tmp_table_size=16MB`
-
-    mysql -e "
-    SELECT (
-          @@read_buffer_size
-        + @@read_rnd_buffer_size
-        + @@sort_buffer_size
-        + @@join_buffer_size
-        + @@binlog_cache_size
-        + @@thread_stack
-        + @@tmp_table_size
-        + 2*@@net_buffer_length
-    ) / (1024 * 1024) AS MEMORY_PER_CON_MB
-    "
-
-System
-------
-Check maximum number of open files allowed for mysql service user:
-
-    su - mysql -s /bin/sh -c "ulimit -n"
-
-Authentification
-----------------
-
-Group mapping ldap-mariadb: [here][ldap]
-
-Replication
------------
-
-
-Purge binlogs while under replication
-
-* Slave: retrieve `Master_Log_File` binlog name
-
-        mysql -e "SHOW SLAVE STATUS\G"
-
-* Master: purge binary logs prior to `Master_Log_File`
-    
-        mysql -e "PURGE BINARY LOGS TO 'mysql-bin.000063'"
-
-
-### Parameters
-
-Master
-    [mysqld]
-    server_id = 1
-    binlog-commit-wait-count=10
-
-Slave
-    [mysqld]
-    server_id = 2
-    innodb_flush_log_at_trx_commit = 2
-	slave_parallel_max_queue= 8MB
-	slave_parallel_mode	aggressive
-	slave_parallel_threads = $(nproc)
-	slave_parallel_workers = $(nproc)
-	gtid_pos_auto_engines = InnoDB,MyISAM
-    #slave-skip-errors=1062
-    #replicate_ignore_db = some_dumb_db
-
-
-### General
-
-Switch slave to master - adapt `/etc/my.cnf` (server_id, binlogs)  and restart
-mysql/mariadb after these steps:
-
-    STOP SLAVE;
-    RESET SLAVE ALL;
-
-Skip one replication error - run on slave:
-
-    STOP SLAVE;
-    SET GLOBAL sql_slave_skip_counter = 1;
-    START SLAVE;
-
-
-Show mysql slave status
-
-    mysql -Bse 'SHOW SLAVE STATUS\G' \
-    | grep -wE '(Last_SQL_Error|Seconds_Behind_Master|Slave_IO_Running|Slave_SQL_Running)'
-
-
-### Re-initialise replication
-
-
-Preparation
-
-INCLUDE_DBs=
-NO_DATA_DBs=
-EXCLUDE_DBs=
-
-
-Master: set up replication user
-
-Master: dump no-data databases
-
-Master: dump data with binlog position 
-
-    mysqldump \
-    --add-drop-database \
-    --hex-blob \
-    --routines \
-    --single-transaction \
-    --triggers \
-    --databases 
-
-
-
-
-
-
-
-
-Requirements for master-slave replication
-
-1. master has binlogs enabled `log-bin = mysql-bin`, validate: `SHOW BINARY LOGS`
-2. master has `server-id = 1`, validate: `SELECT @@server_id`
-3. slave has minimum `server-id = 2`, validate: `SELECT @@server_id` 
-5. schemas which need to be excluded from replication are configured like
-   `replicate_ignore_db = temp_db`
-
-(Re-) initiate master-slave replication
-
-1. slave: `STOP SLAVE`
-2. master: `FLUSH HOSTS`    (reset dns resolve)
-3. master: set up replication user `repli_user` with password `repli_pass`
-
-        CREATE USER IF NOT EXISTS repli_user;
-        ALTER USER repli_user IDENTIFIED BY 'repli_pass';
-        REVOKE ALL PRIVILEGES, GRANT OPTION FROM repli_user;
-        GRANT REPLICATION SLAVE ON *.* TO repli_user;
-        FLUSH PRIVILEGES;
-
-4. master: check if there is more than 1 replication user entry 
-
-        SELECT COUNT(*) from mysql.user where User = repli_user;
-
-5. slave: define replication 
-
-        RESET SLAVE;
-        CHANGE MASTER TO
-            MASTER_HOST="sqlmaster.example.com",
-            MASTER_USER="repli_user",
-            MASTER_PASSWORD="repli_pass",
-            MASTER_PORT=3306,
-            MASTER_CONNECT_RETRY=3;
-
-6. optional: dump and transfer database table structure for schemas where no data shall
-   be excluded (e.g. corresponding to `replicate_ignore_db` entries)
-
-        mysql-dump --no-data --databases temp_db \
-        --add-drop-database \
-        --single-transaction \  
-        | zstd -1 \
-        | ssh sqlslave.example.com "zstd -df | mysql"
-
-7. optional: filter databases to be transferred fully from `SHOW DATABASES`,
-   skipping non-mysql directories and system databases
-
-        mysql -Bse "SELECT DISTINCT table_schema FROM information_schema.tables" \
-        | grep -vwE "(information_schema|mysql|performance_schema)"
-
-8. dump and transfer databases via ssh pipe, here: all databases
-        
-        #mysql-dump --databases db1 db2 \
-        mysql-dump --all-databases \
-        --add-drop-database \
-        --hex-blob \
-        --master-data=1 \
-        --routines \
-        --single-transaction \  
-        --triggers \
-        | zstd -T0 \
-        | ssh sqlslave.example.com "zstd -T0 -dcf | mysql"
-
-9. slave: start replication
-
-        START SLAVE;
-
-10. check slave status after some seconds
-
-        watch "mysql -Bse 'SHOW SLAVE STATUS\G' \
-        | grep -wE '(Last_SQL_Error|Seconds_Behind_Master|Slave_IO_Running|Slave_SQL_Running)'"
-
-
-Dump, backup
-------------
-
-
-Standard dump - all databases. Prepare rebuilding replication from this dump
-
-    mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
-    --single-transaction --all-databases | pigz -c > full_dump.sql.gz
-
-    
-
-Dump with progress meter - estimate max db size from db file size, depending on
-db fragmentation the estimation may be too large
-
-    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir') \ 
-    && DB_SIZE=$(
-        find "$MYSQL_DIR" -type f -printf "%s %p\n" \
-        | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {print s}'
-    ) \
-    && mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
-    --single-transaction --all-databases  \
-    | pv -s $DB_SIZE | pigz -c > /var/backups/xxfull_dump.sql.gz
-
-
-Dump specific databases, only - filter by mysql filter expressions
-
-    # EXCLUDE patterns override INCLUDE patterns
-    INCLUDE='%'
-    EXCLUDE='%xerces% %ota% mysql information_schema performance_schema'
-
-    include_expr="table_schema LIKE \"${INCLUDE// /\" OR table_schema LIKE \"}\""
-    exclude_expr="table_schema LIKE \"${EXCLUDE// /\" OR table_schema LIKE \"}\""
-    DUMP_DATABASES=$( mysql -Bse "
-        SELECT DISTINCT table_schema AS db
-        FROM information_schema.tables
-        WHERE ($include_expr) AND NOT ($exclude_expr)
-        GROUP BY table_schema
+    DBS=$(mysql -Bse "
+        SELECT DISTINCT table_schema FROM information_schema.tables
+        WHERE table_schema REGEXP 'flight|^hot|^my'
     ")
-
-    mysqldump --hex-blob --routines --triggers --master-data=1 --add-drop-database \
-    --single-transaction --databases $DUMP_DATABASES | pigz -c > selected_dbs.sql.gz
-
-
-
-Create local copy of mysql data dir (consistently, without locking running database) - requires [percona xtrabackup](https://www.percona.com/doc/percona-xtrabackup/2.3/backup_scenarios/full_backup.html#preparing-a-backup) package to  be installed.
-
-
-Short version:
-
-    DUMPDIR='/srv/backup-dumps/percona'
-    innobackupex --defaults-extra-file=/etc/mysql/debian.cnf --parallel=4 "$DUMPDIR"
-    innobackupex --apply-log --parallel=4 --use-memory=1G "$DUMPDIR"
-
-
-Robust version:
-
-    DUMPDIR='/srv/backup-dumps/percona'
-    OPTIONS='--defaults-extra-file=/etc/mysql/debian.cnf --parallel=4 --use-memory=1G'
-    innobackupex $OPTIONS --no-timestamp "$DUMPDIR" | tee "$DUMPDIR/xtrabackup_export.log" \
-    && grep -q "completed OK!" "$DUMPDIR/xtrabackup_export.log" \
-    && innobackupex $OPTIONS --apply-log "$DUMPDIR" | tee "$DUMPDIR/xtrabackup_prepare.log" \
-    && grep -q "completed OK" "$DUMPDIR/xtrabackup_prepare.log"
-
-
-Read Lock
----------
-
-Put whole database to read only mode
-
-    FLUSH TABLES WITH READ LOCK;
-    SET GLOBAL read_only = 1;
-
-Back to normal mode
-
-    SET GLOBAL read_only = 0;
-    UNLOCK TABLES;
-
-SQL queries
------------
 
 Histogram: count occurence of discrete values in a column (`history`) of table `items`:
 
@@ -485,4 +87,555 @@ Output:
     +----------+---------+
     14 rows in set (0.04 sec)
 
+
+System
+------
+
+Check maximum number of open files allowed for mysql service user:
+
+    su - mysql -s /bin/sh -c "ulimit -n"
+
+
+Flushing, Locks
+---------------
+
+Put whole database to read only mode
+
+    FLUSH TABLES WITH READ LOCK;
+    SET GLOBAL read_only = 1;
+
+Back to normal mode
+
+    SET GLOBAL read_only = 0;
+    UNLOCK TABLES;
+
+  
+Decrease InnoDB shutdown times - clear dirty pages
+
+    SET GLOBAL innodb_max_dirty_pages_pct = 0   # default 75.000000
+    mysqladmin ext -i10 | grep dirty
+
+
+Users
+-----
+
+Create user with full access to db `seafile_db`
+
+    CREATE USER  IF NOT EXISTS 'seafile'@'%' IDENTIFIED BY 'xxxxx';
+    GRANT ALL PRIVILEGES ON seafile_db.* TO 'seafile'@'%';
+    FLUSH PRIVILEGES;
+
+
+Create root user with full access to all dbs 
+    CREATE USER  IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'xxxxx';
+    GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';
+    FLUSH PRIVILEGES;
+
+
+Update new root password when login is still possible
+
+    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1)
+    mysql -e "
+        UPDATE mysql.user SET password=PASSWORD('$PW') WHERE user='root';
+        FLUSH PRIVILEGES;
+    "
+    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf
+
+
+Reset root password when login is not possible - db is beeing restarted in the process!
+
+    PW=$(tr -dc '[:alnum:]' < /dev/urandom | tr -d "'\"" | fold -w 32 | head -n 1) 
+    mysqladmin shutdown
+    mysqld_safe --skip-grant-tables &
+    while ! mysqladmin ping > /dev/null 2>&1 ; do sleep 1; done
+    mysql -e "UPDATE mysql.user SET Password=PASSWORD('$PW') WHERE user='root';"
+    echo -e "[client]\nuser=root\npassword=$PW" > /root/.my.cnf 
+    chmod 0600 /root/.my.cnf
+    mysqladmin shutdown
+    systemctl start mariadb
+    mysql -e "
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' IDENTIFIED BY '$PW' WITH GRANT OPTION;
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY '$PW' WITH GRANT OPTION;
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'::1'       IDENTIFIED BY '$PW' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    "
+
+
+Drop single user without and with pattern match
+    mysql -e "
+        DROP USER IF EXISTS 'someuser'@'10.10.2.%';
+        DELETE FROM mysql.user WHERE user LIKE 'replication%';
+        FLUSH PRIVILEGES;
+    "
+
+Drop test db, all users without password or non-local root accounts
+
+    mysql -e "
+        DELETE FROM mysql.user WHERE user='root' AND host NOT IN ('localhost', '127.0.0.1', '::1');
+        DELETE FROM mysql.user WHERE user='' OR password='';
+        DROP DATABASE IF EXISTS test;
+        DELETE FROM mysql.db WHERE db='test' OR db='test\\_%';
+        FLUSH PRIVILEGES;
+    "
+
+Change user password
+
+    mysql -e "
+        UPDATE mysql.user SET Password=PASSWORD('xxxxx') 
+        WHERE user='jira' AND host='%'
+    "
+
+Create monitoring user, remove local accounts
+
+    mysql -e "
+        DELETE FROM mysql.user WHERE user = 'nagios' AND  host != '%';
+        GRANT PROCESS,SHOW VIEW,REPLICATION CLIENT,SELECT,SHOW DATABASES ON *.* to nagios@'%' 
+          IDENTIFIED BY PASSWORD '*599FA96B9EF18A97585DE37CE9AA8B7CA751EAC7';
+        FLUSH PRIVILEGES;
+    "
+
+
+LDAP group mapping [ldap-mariadb][ldap]
+
 [ldap]: http://www.geoffmontee.com/configuring-ldap-authentication-and-group-mapping-with-mariadb/
+
+
+## Profiling, performance
+
+Show running queries (you may want to fiddle around with state
+
+    mysql -e "
+        SELECT
+            session.ipaddr,
+            COUNT(1) AS session_count,
+            FLOOR( AVG( session.time ) ) AS duration_avg_s,
+            MAX( session.time ) AS duration_max_s,
+            session.state
+        FROM (
+            SELECT
+                pl.id,
+                pl.user,
+                pl.host,
+                pl.db,
+                pl.command,
+                pl.time,
+                pl.state,
+                pl.info,
+                LEFT( pl.host, ( LOCATE( ':', pl.host ) - 1 ) ) AS ipaddr
+                FROM information_schema.processlist pl
+        )
+        AS session
+        GROUP BY session.ipaddr
+        ORDER BY session_count DESC
+    "
+
+
+
+MariaDB memory allocation: [Official documentation](https://mariadb.com/kb/en/mariadb-memory-allocation)
+
+Queries and processes
+
+    SHOW FULL PROCESSLIST
+
+or
+
+    mytop -dmysql
+
+
+Validate memory overcommit - find out reserved memory, compare against
+available mem
+
+    top -n1 | awk '/mysqld/{print $5}'
+    free -g
+
+
+Check tables with no primary key: may slow down replication
+
+    mysql -e "
+    SELECT tables.table_schema, 
+           tables.table_name, 
+           tables.table_rows 
+    FROM   information_schema.tables 
+           LEFT JOIN (
+                SELECT table_schema, table_name 
+                FROM   information_schema.statistics 
+                GROUP  BY table_schema, table_name, index_name 
+                HAVING SUM(
+                    CASE 
+                    WHEN non_unique = 0 
+                    AND nullable != 'YES' THEN 1 
+                    ELSE 0 
+                end) = Count(*)) puks 
+           ON tables.table_schema = puks.table_schema 
+           AND tables.table_name = puks.table_name 
+    WHERE  puks.table_name IS NULL 
+           AND tables.table_schema NOT IN ( 
+                'mysql', 'information_schema', 'performance_schema' , 'sys' 
+           ) 
+           AND tables.table_type = 'BASE TABLE' 
+           AND engine = 'InnoDB';
+    "
+
+
+Memory per connection - multiply by `max_connections`, most important
+is `tmp_table_size=16MB`
+
+    mysql -e "
+    SELECT (
+          @@read_buffer_size
+        + @@read_rnd_buffer_size
+        + @@sort_buffer_size
+        + @@join_buffer_size
+        + @@binlog_cache_size
+        + @@thread_stack
+        + @@tmp_table_size
+        + 2*@@net_buffer_length
+    ) / (1024 * 1024) AS MEMORY_PER_CON_MB
+    "
+
+## Database size 
+
+Single database size in MB
+    mysql -Bse "
+    SELECT SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024))
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = "<DATABASE>"
+    "
+
+All databases sizes in MB 
+
+    mysql -e '
+    SELECT table_schema AS "Database", 
+    SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024)) 
+    AS "Size [MB]"
+    FROM INFORMATION_SCHEMA.TABLES
+    GROUP BY table_schema
+    '
+
+Single table size in MB
+    db=somedb
+    tb=sometable
+    mysql -Bse "
+    SELECT table_name AS 'Table',
+    round(((data_length + index_length) / 1024 / 1024)) 'Size in MB'
+    FROM information_schema.TABLES
+    WHERE table_schema = '$db'
+    AND table_name = '$tb'
+    "
+
+All databases size [MB] on disk (roughly equivalent to `DATA_LENGTH + INDEX_LENGTH` but faster)
+
+    find /var/lib/mysql -type f -printf "%s %p\n" \
+    | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {print s/1024/1024}'
+
+
+## Binlogs
+
+Binlogs are used for recovering from server crash or for replication. Retention
+period of 1 day is sufficient in most cases (covering short repairs).
+
+Get binlog retention time [days]
+
+    mysql -Bse "SELECT @@expire_logs_days"
+
+Get binlog file size [MB]
+
+    mysql -Bse "SELECT CEILING(@@max_binlog_size /1024 / 1024)"
+
+
+Purge binlogs while under replication
+
+* Slave: retrieve `Master_Log_File` binlog name
+
+        mysql -e "SHOW SLAVE STATUS\G"  | grep -w Master_Log_File
+
+* Master: purge binary logs prior to `Master_Log_File`
+    
+        mysql -e "PURGE BINARY LOGS TO 'mysql-bin.000063'"
+
+
+## Transfer mysql data
+
+In case zstd is not available, replace 
+
+* `zstd -dcf` by `pigz -dc`
+* `zstd -1` by `pigz -c --fast`
+
+### Fast, lock free, binary   
+
+Needs packages zstd (or pigz), netcat-openbsd, pv, xtrabackup (or MariaDB-backup) on both source and target
+
+Prepare target - shut down, reset data
+
+    NETCAT_PORT=3306
+    MYSQL_DIR="$(mysql -Bse "SELECT @@datadir" 2>/dev/null )" || MYSQL_DIR=/var/lib/mysql
+    IMPORT_DIR=${MYSQL_DIR%/}-import
+    mysqladmin ping > /dev/null 2>&1 && mysqladmin shutdown
+    which firewall-cmd 2> /dev/null && firewall-cmd --add-port=$NETCAT_PORT/tcp
+    [ -z "${MYSQL_DIR}" ] || rm -rvf "$MYSQL_DIR"/*
+    [ -z "${IMPORT_DIR}" ] || rm -rvf "$IMPORT_DIR"/*
+    mkdir -pv "${MYSQL_DIR}" "${IMPORT_DIR}"
+
+Run target listener
+    netcat -l $NETCAT_PORT \
+      | pv \
+      | zstd -dcf \
+      | xbstream --directory="$IMPORT_DIR" -x \
+    && time xtrabackup --prepare --target-dir="$IMPORT_DIR" \
+    && mv "$IMPORT_DIR/ib_data1" "$IMPORT_DIR/ibdata1" \
+    && xtrabackup --move-back --target-dir="$IMPORT_DIR" \
+    && mv "$IMPORT_DIR/xtrabackup_binlog_info" "$MYSQL_DIR" \
+    && rm -rf "$IMPORT_DIR" \
+    && install -o mysql -g mysql -d "$MYSQL_DIR"/{,tmp,binlog} /var/{log,lib}/mysql \
+    && chown -R mysql:mysql "$MYSQL_DIR" /var/{log,lib}/mysql \
+    && systemctl start mysql
+
+Prepare source export
+
+    TARGET=some.server.tld
+    NETCAT_PORT=3306
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir')
+    DB_SIZE_MB=$(
+        find "$MYSQL_DIR" -type f -printf "%s %p\n" \
+        | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {print s / 1024 / 1024}'
+    )
+
+Run source export. `-parallel=$(nproc)` does not work out well on systems with
+a lot of cpu cores - too many connections. Parameter -kill-long-queries-timeout
+prevents long READ LOCK (RO-mode of whole databases) - prepare yourselfs
+
+    mariabackup --backup --stream=xbstream --parallel=2 --kill-long-queries-timeout=5 2> mariabackup.log \
+      | pv -s ${DB_SIZE_MB}m\
+      | zstd -1 \
+      | netcat -N $TARGET $NETCAT_PORT \
+    && tail mariabackup.log
+
+
+### Simple, fast, dirty
+
+Rsync binary copy with short read lock on source db - no logical data copy but
+fast. `mysql` database is not overriden here, so replicationuser setup may
+still be intact.
+
+Target: remove all data
+
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir') || MYSQL_DIR= /var/lib/mysql
+    mysqladmin ping > /dev/null 2>&1 && mysqladmin shutdown
+
+Source: copy bulk of data to target, ignore errors
+
+    TARGET=some_server.company.tld
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir') || MYSQL_DIR= /var/lib/mysql
+    rsync -a --sparse --progress --delete $MYSQL_DIR/ $TARGET:$MYSQL_DIR/ \
+    --exclude=mastername* --exclude=master.info --exclude=relay-log.info --exclude=mysql
+
+Source: lock server, read log positions, do final data sync, un-lock
+
+    mysql -e "FLUSH TABLES WITH READ LOCK"
+    mysql -e "show master status\G" | awk '/File:/{print "LOG_FILE="$2}' 
+    mysql -e "show master status\G" | awk '/Position:/{print "LOG_POS="$2}'
+    rsync -a --sparse --progress --delete $MYSQL_DIR/ $TARGET:$MYSQL_DIR/ \
+    --exclude=mastername* --exclude=master.info --exclude=relay-log.info --exclude=mysql
+    mysql -e "UNLOCK TABLES"
+
+
+Target: start db with disabled slave operation, configure replication, restart with replication (without auth setup)
+
+    mysqld_safe --skip-slave-start &
+    MASTER_LOG_FILE=... 
+    MASTER_LOG_POS=...
+    mysql -e "
+        CHANGE MASTER TO
+            MASTER_LOG_FILE='$LOG_FILE',
+            MASTER_LOG_POS=$LOG_POS;
+        START SLAVE;
+    "
+    mysqladmin shutdown
+    systemctl start mariadb
+
+
+### Slow without lock - mysqldump
+
+Takes ages due to slow mysqldump import process but is meant to work on 
+all platforms. Clean, logical export (opposed to rsync method).
+
+Source: 
+
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir')
+    TARGET=some_server.company.tld
+    mysqldump --hex-blob --routines --triggers --master-data=1 \
+    --add-drop-database --single-transaction --databases db1 db2 db5 \
+    | gzip -3 > "$MYSQL_DIR/full_dump.sql.gz"
+
+Source: scp `full_dump.sql.zstd` to target
+
+Target: import database data
+
+    mysql -e "STOP SLAVE"
+    zcat full_backup.sql.gz | mysql
+
+Target: retrieve master binlog file and position, optionally 
+
+    zcat full_backup.sql.gz | head -n 30 | grep "^CHANGE MASTER TO" \
+    | cut -d ' ' -f4- | tr ',' ';'
+
+
+### Option: transfer nodata databases
+
+Drop data in target databases, re-create structure for databases which are for example ignored in replication but should be there, somehow (as structure). Run on target (or source, if `NODATA_DBS` have not been transferred at all)
+
+
+    # see "Select databases" for REGEXP usage
+    NODATA_DBS="db1 db3 db7"
+    mysqldump --add-drop-database --routines --triggers --no-data --databases $NODATA_DBS \
+    | pigz -c > nodata.sql.gz
+
+Import on target, overriding old db content:
+
+    pigz -dc nodata.sql.gz | mysql
+
+
+
+## Replication
+
+Requirements for master-slave replication
+
+1. master has binlogs enabled `log-bin = mysql-bin`, validate: `SHOW BINARY LOGS`
+2. master has `server-id = 1`, validate: `SELECT @@server_id`
+3. slave has minimum `server-id = 2`, validate: `SELECT @@server_id` 
+5. schemas which need to be excluded from replication are configured like
+   `replicate_ignore_db = temp_db`
+
+### Operations
+
+Stop and unconfigure replication info from slave
+
+    mysql -e "
+        STOP SLAVE;
+        RESET SLAVE ALL;
+    "
+
+
+Skip one replication error - run on slave:
+
+    mysql -e "
+        STOP SLAVE;
+        SET GLOBAL sql_slave_skip_counter = 1;
+        START SLAVE;
+    "
+
+
+Check slave status continuously
+
+     watch -n 10 "
+         mysql -Bse 'SHOW SLAVE STATUS\G' | grep -E \
+         'Slave_IO_Running:|Slave_SQL_Running:|Seconds_Behind_Master:|Last_SQL_Error'
+     "
+
+### Config
+
+Master
+    [mysqld]
+    server_id = 1
+
+Slave
+    [mysqld]
+    server_id = 2
+    innodb_flush_log_at_trx_commit = 2
+	slave_parallel_max_queue= 8MB
+	slave_parallel_mode	aggressive
+	slave_parallel_threads = $(nproc)
+	slave_parallel_workers = $(nproc)
+	gtid_pos_auto_engines = InnoDB,MyISAM
+    #replicate_ignore_db = some_db
+
+### Set up 
+
+Re-initialize replication user and connection
+
+Master: set up replication user
+
+    REPL_USER=replication02 \
+    && REPL_PASS="$(tr -dc '[:alnum:]' < /dev/urandom | head -c 32 && echo)" \
+    && mysql -Bse "
+      DELETE FROM mysql.user WHERE user='$REPL_USER';
+      GRANT REPLICATION SLAVE ON *.* TO $REPL_USER@'%'
+      IDENTIFIED BY '$REPL_PASS';
+      FLUSH PRIVILEGES;
+    " 
+    echo -e "RUN ON SLAVE:\n"
+    cat << SLAVE_END
+    #LOG_FILE=?
+    #LOG_POS=? 
+    mysql -e "
+        STOP SLAVE;
+        CHANGE MASTER TO
+            MASTER_HOST='$MASTER',
+            MASTER_PORT=3306,
+            MASTER_USER='$REPL_USER',
+            MASTER_PASSWORD='$REPL_PASS',
+            MASTER_LOG_FILE='\$LOG_FILE',
+            MASTER_LOG_POS=\$LOG_POS;
+        START SLAVE;
+    "
+    fi
+    SLAVE_END
+
+Paste RUN ON SLAVE: output above and check replication state:
+
+    mysql -Bse "SHOW SLAVE STATUS\G"
+
+
+Dump, backup
+------------
+
+
+Export dump - all databases. Prepare rebuilding replication from this dump
+
+    mysqldump --add-drop-database --all-databases --events --hex-blob \
+    --ignore-table=mysql.events --master-data=1 --master-data=1 \
+    --routines --single-transaction --triggers | pigz -cR > all-databases.sql.gz
+
+
+Import dump
+
+    pigz -dc all-databases.sql.gz | mysql
+
+    
+Export dump like above but with progress meter - estimate max db size from db file
+size, depending on db fragmentation the estimation may be too large
+
+    MYSQL_DIR=$(mysql -Bse 'SELECT @@datadir') \ 
+    && DB_SIZE_MB=$(
+        find "$MYSQL_DIR" -type f -printf "%s %p\n" \
+        | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {printf "%.0f", s/1024/1024}'
+    ) \
+    && mysqldump --add-drop-database --all-databases --events --hex-blob \
+       --ignore-table=mysql.events --master-data=1 --master-data=1 \
+       --routines --single-transaction --triggers \
+    | pv -s "${DB_SIZE_MB}m" | pigz -cR > "$MYSQL_DIR/.all-databases.sql.gz"
+
+
+Import dump like above but with progress meter
+
+    pv all-databases.sql.gz | pigz -dc | mysql
+
+
+Dump specific databases, only - filter by mysql filter expressions
+
+    # EXCLUDE patterns override INCLUDE patterns
+    INCLUDE='%'
+    EXCLUDE='%xerces% %ota% mysql information_schema performance_schema'
+
+    include_expr="table_schema LIKE \"${INCLUDE// /\" OR table_schema LIKE \"}\""
+    exclude_expr="table_schema LIKE \"${EXCLUDE// /\" OR table_schema LIKE \"}\""
+    DATABASES=$( mysql -Bse "
+        SELECT DISTINCT table_schema AS db
+        FROM information_schema.tables
+        WHERE ($include_expr) AND NOT ($exclude_expr)
+        GROUP BY table_schema
+    ")
+
+    mysqldump ... --databases $DATABASES ...
+
+

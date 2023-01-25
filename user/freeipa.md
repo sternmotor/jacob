@@ -6,7 +6,12 @@ Users
 
 Set user password to not-expire
 
-    ipa user-mod rollout --setattr=krbPasswordExpiration=20440506103757Z
+    ipa user-mod f.lastname --setattr=krbPasswordExpiration=20440506103757Z
+    ipa user-mod f.lastname --password-expiration='2099-12-31 23:59:59Z'
+
+Show user details 
+
+    ipa user-show f.lastname --all
 
 
 Hosts

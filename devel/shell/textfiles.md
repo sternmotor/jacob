@@ -10,3 +10,7 @@ comments, remove surrounding  whitespaces and quotes:
         -e 's/[^=]*=\s*\(.*\)\s*$/\1/' -e 's/\s*$//'    \
         -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" \
         "$FILE"
+
+Strip trailing newline from docekr secrets file etc.
+
+    PW="$(printf '%s' $(cat $PASSWORD_FILE))"

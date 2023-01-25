@@ -20,6 +20,21 @@ Check if string is a integer - dows not work with floats
 
     test [ ! -z "$number" ] && [ -z "${number//[0-9]/} ]
 
+
+
+Sum a list of numbers, one int per line (first column)
+
+    awk '{s+=$1} END {print s}' < numbers.txt
+
+    virsh domstats --list-active --balloon \
+    | awk -F= '/balloon.current/{s+=$2} END {print s}'
+
+
+Shell calculations - no need for "`$`" inside `$(())`
+
+    echo $(( (host_mem - vm_mem) / 1024 / 1024 )) GB
+
+
 Arrays
 ------
 

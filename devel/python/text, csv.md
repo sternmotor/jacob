@@ -44,10 +44,9 @@ Read CSV from disk
 Store CSV on disk
 
     with open('outfile', 'w') as csvfile
-        csvwriter = csv.DictWriter(csvfile, csv_headers, restval='-', dialect='unix', )
-        csvwriter.writeheader()
-        for data_set in csv_data:
-            csvwriter.writerow(data_set)
+        writer = csv.DictWriter(csvfile, csv_headers, dialect='unix')
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 Store CSV in variable - virtual writer

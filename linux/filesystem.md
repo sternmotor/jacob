@@ -20,8 +20,6 @@ Copy devices
 Pipe transfer of disk devices
 -----------------------------
 
-### General
-
 slow but convient via ssh 
 
     pv /dev/sdb | zstd -1 | ssh some_host.example.com 'zstd -dcf > /dev/sdb'
@@ -33,6 +31,70 @@ faster for big drives, no ssh, requires netcact-openbsd
 
     # source
     pv /dev/sdb | zstd -1 | netcat -N target.example.com 7000
+
+
+MBR partitions
+-----------------
+
+Re-read partition table - try:
+
+    partprobe /dev/sdX 
+    blockdev --rereadpt /dev/sdX
+
+Expand last partition to maximum available space - without reboot
+
+    yum install -y cloud-utils-growpart
+    growpart /dev/sdb 3
+    resize2fs /dev/sda3
+
+`cfdisk` writes cleanest partition tables compared to `fdisk` oder MS_DOS tools
+
+* start with new partition table
+
+    cfdisk -z /dev/vdd
+
+
+`sfdisk` allows dumping and cloning partition tables
+
+
+
+GPT partitions
+----------------
+
+Create GPT partition scheme
+
+* reset partition layout and mbr
+
+    ROOT_DRIVE=/dev/sdb
+    dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 status=none \
+    && seek_block=$(($(blockdev --getsz $ROOT_DRIVE) - 2)) \
+    && dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 seek=$seek_block status=none
+
+* write new partitions
+
+    parted    --align optimal --script $ROOT_DRIVE -- mklabel gpt \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart ${HOST}_BIOS fat32 2048s 4095s \
+    && parted                 --script $ROOT_DRIVE -- set 1 bios_grub on \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart BOOT ext4 4095s 512MiB \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart RESCUE ext4 512Mib 10GiB \
+    && parted --align optimal --script $ROOT_DRIVE -- mkpart LIVE btrfs 10GiB 100% \
+    && parted $ROOT_DRIVE print
+
+* format drives (boot, rescue)
+
+    sleep 1 \
+    && mkfs.ext4 -q -G 4096 -qF -m 0 -L "LIVE_BOOT" ${ROOT_DRIVE}2 \
+    && mkfs.ext4 -q -G 4096 -qF -m 5 -L "RESCUE" ${ROOT_DRIVE}3
+
+Make partition accessible directly - for example: mount lvm volumes sub-partitions:
+
+    kpartx -av /dev/vg0/test
+    mount /dev/vg0/test1 /mnt
+    
+Remove mount and mapping
+
+    umount -l /mnt
+    kaprtx -dv /dev/vg0/test
 
 
 ### LVM
@@ -74,65 +136,14 @@ Option: create and remove LVM snapshot before/after transfer
     lvremove /dev/mapper/vg0-diskname-snap
 
 
+Filesystem cache
+------------------
 
-MBR Partitionen
------------------
+May run into swapping while bigger (cp) operations, clear like
 
-`cfdisk` writes cleanest partition tables compared to `fdisk` oder MS_DOS tools
+    echo 3 > /proc/sys/vm/drop_caches
+    swapoff -a && swapon -a
 
-* start with new partition table
-
-    cfdisk -z /dev/vdd
-
-
-`sfdisk` allows dumping and cloning partition tables
-
-Expand last partition to maximum available space
-
-    yum install -y cloud-utils-growpart
-    growpart /dev/sdb 4
-
-Re-read partition table
-
-    blockdev --rereadpt /dev/sdX
-
-GPT Partitionen
-----------------
-
-Create GPT partition scheme
-
-* reset partition layout and mbr
-
-    ROOT_DRIVE=/dev/sdb
-    dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 status=none \
-    && seek_block=$(($(blockdev --getsz $ROOT_DRIVE) - 2)) \
-    && dd if=/dev/zero of=$ROOT_DRIVE bs=512 count=2 seek=$seek_block status=none
-
-* write new partitions
-
-    parted    --align optimal --script $ROOT_DRIVE -- mklabel gpt \
-    && parted --align optimal --script $ROOT_DRIVE -- mkpart ${HOST}_BIOS fat32 2048s 4095s \
-    && parted                 --script $ROOT_DRIVE -- set 1 bios_grub on \
-    && parted --align optimal --script $ROOT_DRIVE -- mkpart BOOT ext4 4095s 512MiB \
-    && parted --align optimal --script $ROOT_DRIVE -- mkpart RESCUE ext4 512Mib 10GiB \
-    && parted --align optimal --script $ROOT_DRIVE -- mkpart LIVE btrfs 10GiB 100% \
-    && parted $ROOT_DRIVE print
-
-* format drives (boot, rescue)
-
-    sleep 1 \
-    && mkfs.ext4 -q -G 4096 -qF -m 0 -L "LIVE_BOOT" ${ROOT_DRIVE}2 \
-    && mkfs.ext4 -q -G 4096 -qF -m 5 -L "RESCUE" ${ROOT_DRIVE}3
-
-Make partition accessible directly - for example: mount lvm volumes sub-partitions:
-
-    kpartx -av /dev/vg0/test
-    mount /dev/vg0/test1 /mnt
-    
-Remove mount and mapping
-
-    umount -l /mnt
-    kaprtx -dv /dev/vg0/test
 
 EXT Filesystem
 --------------
@@ -152,13 +163,24 @@ Shrink file system on partitionless lvm to 50GB
 BTRFS Filesystem
 ----------------
 
-Maintenance
+### Maintenance
 
-    sudo btrfs filesystem balance /srv
+TODO: https://github.com/kdave/btrfsmaintenance
+
+
+Defragment
+
     sudo btrfs filesystem defrag -c /srv
 
-    # Wenn falsche FS Belegung angezeigt wird (100% full):    
-    btrfs balance --full-balance /srv/
+
+Fix btrfs error "no space left on device" but du-csh looks good:
+
+    # tmux + start
+    btrfs balance start --full-balance /srv/
+
+Status for rebalance
+
+    btrfs fi balance status /srv
 
 Show subvolumes
 
@@ -187,10 +209,10 @@ Re-compress MySQL partitions (inndob with DirectIO circumventing compression):
     sudo btrfs defragment  -rcf <path>
     sudo btrfs filesystem df <path>
 
-Create compressed file system 
+Create compressed file system, mount options
 
     mkfs.btrfs -L SRV /dev/vol1/srv
-    echo '/dev/mapper/bg0-srv /srv btrfs defaults,noatime,nofail,acl,nodev,nosuid,compress=zstd:1 0 0' >> /etc/fstab
+    echo '/dev/vg0/srv /srv btrfs defaults,noatime,nofail,acl,nodev,nosuid,compress-force=zstd:1 0 0' >> /etc/fstab
     mount /srv
 
 Troubleshooting "btrfs_replay_log:2288: errno=-22 unknown (Failed to recover log tree)"
@@ -199,6 +221,23 @@ Troubleshooting "btrfs_replay_log:2288: errno=-22 unknown (Failed to recover log
     btrfs rescue zero-log /dev/vdb
     btrfs scrub start /dev/vdb  # healthcheck
     watch -n 10 btrfs scrub status /dev/vdb
+
+
+Install and use compsize for checking btrfs uncompressed size
+
+
+    yum install -y git gcc-c++ btrfs-progs-devel \
+    && git clone https://github.com/kilobyte/compsize compsize-git \
+    && cd compsize-git \
+    && make \
+    && make install \
+    && cd .. \
+    && rm -rf compsize-git
+
+    yum remove -y git gcc-c++ btrfs-progs-devel
+    yum autoremove
+
+    compsize -x /srv
     
 
 Permissions

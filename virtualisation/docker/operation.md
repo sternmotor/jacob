@@ -27,6 +27,29 @@ NOT tested: e.g. if the container doesn't have ip commands in it
 
     nsenter -n -t $(docker inspect --format {{.State.Pid}} $dockername) ip route add something.
 
+
+Reload container
+----------------
+
+Retrieve container name, send SIGHUP there
+
+    #!/bin/bash
+    set -euo pipefail
+    LANG=C
+
+    SERVICE='haproxy'   # docker-compose.yml service name
+    SCRIPT_DIR="$(dirname "$0")"
+
+    container=$(
+        docker inspect -f '{{.Name}}' $(
+            docker-compose --project-directory="$SCRIPT_DIR" ps -q $SERVICE
+        ) | cut -c2-
+    )
+
+    docker exec $container haproxy -c -V -f /etc/haproxy/haproxy.cfg \
+    && docker kill -s HUP $container
+
+
 Ressources
 ----------
 

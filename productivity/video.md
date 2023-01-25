@@ -1,6 +1,11 @@
 Video file handling
 ===================
 
+Video Cutting
+--------------
+
+Camtasia - Windows video cut software
+
 Handbrake Usage
 ------------
 

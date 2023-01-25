@@ -33,12 +33,25 @@ Linux desktop java console setup
 * check settings in IcedTea system control GUI, run firefox to start the whole thing
 
 
-DELL
-----
+## DELL
+
+### StoreCLI/LSI management
 
 
-MegaRaid/LSI management
------------------------
+* download https://docs.broadcom.com/docs/007.0709.0000.0000_Unified_StorCLI.zip
+* install
+
+    rpm -i storcli-007.0709.0000.0000-1.noarch.rpm
+    ln -s /opt/MegaRAID/storcli/storcli64 /usr/local/bin/storcli
+
+    storcli /c0 /eall /sall show
+    storcli /c0 /vall show
+
+    # show rebuild
+    storcli /c0 /eall /sall show rebuild
+
+
+### MegaRaid/LSI management
 
 volume config overview (raid level)
 

@@ -79,6 +79,62 @@ CentOS 8 Problem with outdated package repositories
     /etc/yum.repos.d/CentOS-*
 
 
+## build rpm
+
+install packages
+
+    yum install -y rpmdevtools gcc gcc-c++ xz libtool make bzip2
+
+set up directory structure like
+
+    rpmbuild/
+        BUILD
+        BUILD/grub-2.04
+        SOURCES
+        SOURCES/grub-2.04.tar.gz
+        SPECS
+        SPECS/grub.spec
+        SRPMS
+        BUILDROOT
+        BUILDROOT/grub-2.04-1.el7.x86_64
+        RPMS
+
+compile package into rpm: edit `rpmbuild/SPECS/grub.spec`
+
+    Name:           grub
+    Version:        2.04
+    Release:        1%{?dist}
+    Summary:        Grand Unified Bootloader for CentOS
+
+    License:        GNU General Public License
+    URL:            https://www.gnu.org/software/grub/index.html
+    Source0:        grub-2.04.tar.gz
+
+    BuildRequires:  gcc
+
+
+    %description
+    Installs boot loader to lvm volumes with no partition table. Static build.
+
+    %prep
+    %setup -q
+
+
+    %build
+    %configure --prefix='/' --target=x86_64 --disable-werror --with-platform=efi
+    make  CHOST="x86_64-pc-linux-gnu" SHARED=0 CC='gcc -static' -j $(( $(nproc) + 1 )) || /bin/true
+
+
+    %install
+    rm -rf $RPM_BUILD_ROOT
+    %make_install
+
+
+    %files
+
+
+
+
 ## Network config
 
 Server vmhost bridge for some VM
