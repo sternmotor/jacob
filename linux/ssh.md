@@ -8,13 +8,6 @@ Quickly allow ssh root loging
     systemctl restart sshd
 
 
-Generate ssh key pair:
-
-    [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -a 256 -N '' -f ~/.ssh/id_ed25519 \
-    -C $(whoami)@$(hostname -f)_$(date +%Y-%m-%d)
-    cat  ~/.ssh/id_ed25519.pub
-
-
 Pull remote ssh host key
 
     TARGET=some-host.example.com
@@ -24,6 +17,23 @@ Pull remote ssh host key
 Hand over password from variable
 
     sshpass -p "$PASSWORD" ssh user@host
+
+## Key management
+
+Generate ssh key pair:
+
+    [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -a 256 -N '' -f ~/.ssh/id_ed25519 \
+    -C $(whoami)@$(hostname -f)_$(date +%Y-%m-%d)
+    cat  ~/.ssh/id_ed25519.pub
+
+
+Convert ssh (commercial version, puttygen) public key to openssh pubkey
+
+    ssh-keygen -i -f id_rsa2.pub > id_rsa.pub
+
+Convert openssh public key to ssh v2 key
+
+    ssh-keygen -e -f id_rsa.pub > id_rsa2.pub
 
 
 ## sFTP
@@ -108,7 +118,7 @@ Bastion host usage
     ssh -o ProxyCommand="ssh -W %h:%p -p 22 bastion.example.com" server1 
 
 
-## Tunneling
+## Tunneling, port forwarding
 
 Configure transparent jumps over multiple hosts in `~/.ssh/config` where only host "jump" is directly reachable. This works transparently with git and scp. As example, remote (host "target") Port 443 is forwarded to local machine port 4443.
 
@@ -138,6 +148,11 @@ Socks proxy (SOCKS4/5 proxy at localhost:3333). Check
 whether it's working by surfing e.g. to checkip.dyndns.org)
 
     ssh -ND 3333 username@external.machine
+
+
+Speed up tunneling ssh through SSH or trusted VPN/LAN
+
+    ssh -oCiphers=arcfour -oClearAllForwardings=yes
 
 ## Persistent connections
 

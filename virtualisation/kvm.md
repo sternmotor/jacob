@@ -32,6 +32,9 @@ Set autostart for all vms
 CPU, Mem
 --------
 
+Read here for kv m options https://libvirt.org/formatdomain.html
+
+
 Offline resize
 
     virsh setvcpus <vm_name> <available_cpus> --config --maximum
@@ -142,6 +145,25 @@ Remove machine on source server after checking that everything is fine
     virsh undefine $VM --remove-all-storage --delete-snapshots
 
 
+## Network interfaces
+
+Add network interface on host bridge - live
+
+    virsh attach-interface --domain ftp.example.com --type bridge \
+    --source br2201 --model virtio \
+    --mac 52:54:00:4b:73:5f --config --live
+
+
+Remove network interface from guest 
+
+    virsh detach-interface --domain ftp.example.com --type network \
+    --mac 52:53:00:4b:75:6f --config
+
+* while detaching, using the `--live` parameter is not recommended as
+  it might affect any existing network activities on the NIC to be removed
+
+
+
 Disable kvm host swapping when vm mem is low
 --------------------------------------------
 
@@ -187,5 +209,32 @@ Security
 
 [kvm_clock]: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/virtualization_administration_guide/sect-virtualization-tips_and_tricks-libvirt_managed_timers]
 
+
+## KVM Management 
+
+See this [overview](https://www.linux-kvm.org/page/Management_Tools).
+
+Linux GUI with device management +  console: [virtual machine manager][vmm]
+
+* Adding connections: run gconf-editor
+
+    gconf-editor > org > virt-manager > virt-manager > connections > uris
+
+* edit 
+
+    [
+    'qemu+ssh://ssh_user@kvmhost01.example.com',
+    'qemu+ssh://ssh_user@kvmhost78.example.com',
+    'qemu:///system'
+    ]
+
+Web Manager with console support: [WebVirtMgr][wvm]
+
+
+
+
+
+[vmm]: https://virt-manager.org/
+[wvm]: http://retspen.github.io
 
 

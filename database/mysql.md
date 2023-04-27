@@ -185,6 +185,11 @@ Change user password
         WHERE user='jira' AND host='%'
     "
 
+Grep password from `my.cnf`
+
+    PW=$(awk -F= '/^password/{print $2; exit}' ~/.my.cnf | tr -d ' ')
+
+
 Create monitoring user, remove local accounts
 
     mysql -e "
@@ -296,36 +301,40 @@ is `tmp_table_size=16MB`
 ## Database size 
 
 Single database size in MB
+
     mysql -Bse "
-    SELECT SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024))
-    FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_SCHEMA = "<DATABASE>"
+        SELECT SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024))
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = "<DATABASE>"
     "
 
 All databases sizes in MB 
 
-    mysql -e '
-    SELECT table_schema AS "Database", 
-    SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024)) 
-    AS "Size [MB]"
-    FROM INFORMATION_SCHEMA.TABLES
-    GROUP BY table_schema
-    '
+    mysql -e "
+        SELECT 
+            table_schema AS 'Database', 
+            SUM(ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024)) AS 'Size in MB'
+        FROM INFORMATION_SCHEMA.TABLES
+        GROUP BY table_schema
+    "
 
 Single table size in MB
-    db=somedb
-    tb=sometable
-    mysql -Bse "
-    SELECT table_name AS 'Table',
-    round(((data_length + index_length) / 1024 / 1024)) 'Size in MB'
-    FROM information_schema.TABLES
-    WHERE table_schema = '$db'
-    AND table_name = '$tb'
+
+    mysql -e "
+        SELECT DISTINCT 
+            table_schema AS 'Database', 
+            table_name AS 'Table',
+            round(((data_length + index_length) / 1024 )) AS 'Size in kB'
+        FROM information_schema.tables
+        WHERE table_schema NOT IN (
+            'mysql', 'information_schema', 'performance_schema' , 'sys'
+        ) 
     "
 
 All databases size [MB] on disk (roughly equivalent to `DATA_LENGTH + INDEX_LENGTH` but faster)
 
-    find /var/lib/mysql -type f -printf "%s %p\n" \
+    data_dir=$(mysql -Bse 'SELECT @@datadir') || datadir=/var/lib/mysql     
+    find "$data_dir" -type f -printf "%s %p\n" \
     | awk '/ibd$|frm$|MYI$|MYD$|ibdata[0-9]/{s+=$1} END {print s/1024/1024}'
 
 

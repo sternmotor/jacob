@@ -1,7 +1,8 @@
+# IMAP mail handling with python
 
-python imaplib:
+python imaplib
 
-    * check http://www.faqs.org/rfcs/rfc3501.html for SEARCH syntax
+* check http://www.faqs.org/rfcs/rfc3501.html for SEARCH syntax
 
 Receive mails from imap accounts
 

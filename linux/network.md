@@ -73,6 +73,12 @@ Usage
 
         nmcli con del vlan20
 
+* add ip to interface
+
+        nmcli con show || systemctl enable --now NetworkManager
+        nmcli con mod eth1 +ipv4.addresses 10.21.25.163/24
+        nmcli con up eth1
+
 
 ### CentOS7
 

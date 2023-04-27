@@ -176,7 +176,7 @@ Defragment
 Fix btrfs error "no space left on device" but du-csh looks good:
 
     # tmux + start
-    btrfs balance start --full-balance /srv/
+    btrfs balance start --full-balance /srv/ && exit
 
 Status for rebalance
 
@@ -288,3 +288,35 @@ Split read and write test, Direct IO (no system buffers), 4K/1MB blocksize:
             --refill_buffers --group_reporting --runtime=$TIME --time_based
         done
     done
+
+
+Speed test for etcd - see [etcd use case][fio_etcd]: "99th percentile of this metric should be less than 10ms for storage to be considered fast enough"
+
+* start 
+
+        fio --rw=write --ioengine=sync --fdatasync=1 --directory=test-data \
+        --size=22m --bs=2300 --name=mytest
+
+* output: analyse `fdatasync` (fio 3.5+)
+
+        fsync/fdatasync/sync_file_range:
+            sync (usec): min=534, max=15766, avg=1273.08, stdev=1084.70
+            sync percentiles (usec):
+            | 1.00th=[ 553], 5.00th=[ 578], 10.00th=[ 594], 20.00th=[ 627],
+            | 30.00th=[ 709], 40.00th=[ 750], 50.00th=[ 783], 60.00th=[ 1549],
+            | 70.00th=[ 1729], 80.00th=[ 1991], 90.00th=[ 2180], 95.00th=[ 2278],
+            | 99.00th=[ 2376], 99.50th=[ 9634], 99.90th=[15795], 99.95th=[15795],
+            | 99.99th=[15795]
+
+* result: `99.00th=[ 2376]` = 2.4ms - this is rather close to 10ms considering
+  other I/O activities
+
+
+[fio_etcd]: https://www.ibm.com/cloud/blog/using-fio-to-tell-whether-your-storage-is-fast-enough-for-etcd
+
+
+## mounted filesystems
+
+fetch total size of all local disks - size GB, types are limited
+
+    df -BG --total --output=size,target --type=ext4 --type=btrfs --type=xfs
